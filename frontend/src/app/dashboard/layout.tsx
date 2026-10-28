@@ -380,10 +380,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <img
             src="/logo.png"
             alt=""
-            className={`object-contain select-none h-auto w-[min(92vw,92vh,1100px)] max-w-none ${
+            style={{
+              // Radial mask fades the logo's own square black background out to
+              // nothing toward the edges, so no hard image border/box shows —
+              // only the artwork in the middle bleeds softly into the page.
+              WebkitMaskImage:
+                'radial-gradient(circle at 50% 50%, #000 42%, transparent 72%)',
+              maskImage:
+                'radial-gradient(circle at 50% 50%, #000 42%, transparent 72%)',
+            }}
+            className={`object-contain select-none h-auto w-[min(100vw,100vh,1300px)] max-w-none ${
               contentTheme === 'light'
-                ? 'opacity-[0.04] [filter:grayscale(1)_brightness(1.9)]'
-                : 'opacity-[0.05]'
+                ? 'opacity-[0.05] [filter:grayscale(1)_brightness(2.1)]'
+                : 'opacity-[0.06] [filter:brightness(1.15)]'
             }`}
           />
         </div>
