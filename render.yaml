@@ -34,7 +34,11 @@ services:
     # the ~400ms seen when the DB was in another region):
     #   DATABASE_URL         -> transaction pooler, port 6543, ?pgbouncer=true
     #   MIGRATE_DATABASE_URL -> session pooler,     port 5432 (needed for migrations)
-    startCommand: node dist/main.js
+    # NestJS outputs to dist/src/main.js here because tsconfig includes BOTH
+    # "src/**/*" and "api/**/*" (the Vercel serverless entry), so the build
+    # preserves the src/ directory structure. Pointing at dist/main.js fails
+    # with MODULE_NOT_FOUND.
+    startCommand: node dist/src/main.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
