@@ -559,15 +559,15 @@ export default function StaffDailyReportPage() {
                       // identically (the logos already carry their own colored
                       // circular background, so object-cover crops to the same
                       // circle edge and all three read the same size).
-                      <span className="block h-5 w-5 shrink-0 overflow-hidden rounded-full">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={`/payments/${r.icon}.png`}
                           alt=""
-                          // BDO's wordmark is wider (3 letters), so a smaller
-                          // zoom keeps the "O" from being clipped; Gcash/BPI can
-                          // zoom a touch more to fill the circle evenly.
-                          className={`h-full w-full object-cover ${r.icon === 'bdo' ? 'scale-[1.12]' : 'scale-[1.3]'}`}
+                          // object-contain shows each logo WHOLE (never clipping
+                          // the "O" / wordmark). The logos carry their own colored
+                          // circle, so the badge reads clean and consistent.
+                          className="h-full w-full object-contain"
                         />
                       </span>
                     )}
