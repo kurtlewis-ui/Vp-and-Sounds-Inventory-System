@@ -564,7 +564,10 @@ export default function StaffDailyReportPage() {
                         <img
                           src={`/payments/${r.icon}.png`}
                           alt=""
-                          className="h-full w-full scale-[1.35] object-cover"
+                          // BDO's wordmark is wider (3 letters), so a smaller
+                          // zoom keeps the "O" from being clipped; Gcash/BPI can
+                          // zoom a touch more to fill the circle evenly.
+                          className={`h-full w-full object-cover ${r.icon === 'bdo' ? 'scale-[1.12]' : 'scale-[1.3]'}`}
                         />
                       </span>
                     )}
