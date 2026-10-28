@@ -364,38 +364,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* Centered, FIXED logo watermark behind the content area. Only shown to
-          Owner and Admin (not Viewer). Sits in the content column (offset past
-          the 240px sidebar on desktop), stays put while the page scrolls, and
-          never intercepts clicks (pointer-events-none). Kept very faint so it
-          reads as an elegant brand watermark without hurting legibility. In
-          light mode the chrome logo is lightened (brightness/invert) so it
-          stays a soft light wash on the white canvas instead of a dark blob. */}
+      {/* FIXED, theme-aware brand wallpaper behind the content area. Only shown
+          to Owner and Admin (not Viewer). Sits in the content column (offset
+          past the 240px sidebar on desktop), stays put while the page scrolls,
+          and never intercepts clicks (pointer-events-none). The wallpaper
+          already contains the faceted texture + centered logo in one image, so
+          `background-size: cover` + center means it fills the area and zooms in
+          (logo stays prominent) on small screens, and spreads out on large
+          ones. Kept faint (~15%) so it reads as an elegant brand backdrop
+          without hurting legibility of the data on top. */}
       {(user?.role?.name === 'Owner' || user?.role?.name === 'Admin') && (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden lg:left-[240px]"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt=""
-            style={{
-              // Radial mask fades the logo's own square black background out to
-              // nothing toward the edges, so no hard image border/box shows —
-              // only the artwork in the middle bleeds softly into the page.
-              WebkitMaskImage:
-                'radial-gradient(circle at 50% 50%, #000 42%, transparent 72%)',
-              maskImage:
-                'radial-gradient(circle at 50% 50%, #000 42%, transparent 72%)',
-            }}
-            className={`object-contain select-none h-auto w-[min(100vw,100vh,1300px)] max-w-none ${
-              contentTheme === 'light'
-                ? 'opacity-[0.05] [filter:grayscale(1)_brightness(2.1)]'
-                : 'opacity-[0.06] [filter:brightness(1.15)]'
-            }`}
-          />
-        </div>
+          className="pointer-events-none fixed inset-0 z-0 overflow-hidden lg:left-[240px]"
+          style={{
+            backgroundImage: `url(${contentTheme === 'light' ? '/wallpaper-light.png' : '/wallpaper-dark.png'})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: 0.15,
+          }}
+        />
       )}
 
       {/* Main content area — offset by sidebar width, applies theme */}

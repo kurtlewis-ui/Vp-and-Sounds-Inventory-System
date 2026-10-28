@@ -241,9 +241,28 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
         <div className="w-9" />
       </header>
 
+      {/* FIXED, theme-aware brand wallpaper behind the staff content area.
+          Offset past the 220px sidebar on desktop; stays put on scroll; never
+          intercepts clicks. The wallpaper has the faceted texture + centered
+          logo baked in, so cover + center fills the area and zooms in on small
+          screens. Kept faint (~15%) so content stays readable on top. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-0 overflow-hidden md:left-[220px]"
+        style={{
+          backgroundImage: `url(${contentTheme === 'light' ? '/wallpaper-light.png' : '/wallpaper-dark.png'})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.15,
+        }}
+      />
+
       {/* Main content — applies theme */}
-      <div className={`flex-1 md:ml-[220px] content-transition ${contentTheme === 'light' ? 'content-light' : ''}`}>
-        <main className="px-4 py-6 pt-20 sm:px-6 md:pt-6 lg:px-8 max-w-[1200px] xl:max-w-[1440px] mx-auto bg-page-bg min-h-screen">{children}</main>
+      <div className={`relative z-10 flex-1 md:ml-[220px] content-transition ${contentTheme === 'light' ? 'content-light' : ''}`}>
+        {/* Background transparent (not bg-page-bg) so the brand wallpaper shows
+            through; the root canvas still paints the base page color. */}
+        <main className="px-4 py-6 pt-20 sm:px-6 md:pt-6 lg:px-8 max-w-[1200px] xl:max-w-[1440px] mx-auto min-h-screen">{children}</main>
       </div>
 
       <DraftBag />
