@@ -32,6 +32,18 @@ export class DisposalsService {
       throw new NotFoundException('Product not found');
     }
 
+    // Resolve the variant (flavor/color) if one was chosen; validate it belongs
+    // to this product. variantName is snapshotted onto the disposal record.
+    let variant: { id: string; name: string } | null = null;
+    if (dto.variantId) {
+      const v = await this.prisma.productVariant.findFirst({
+        where: { id: dto.variantId, productId: product.id, deletedAt: null },
+        select: { id: true, name: true },
+      });
+      if (!v) throw new BadRequestException('Selected flavor/variant is no longer available for this product.');
+      variant = v;
+    }
+
     // A disposal is a loss of what the goods COST us (capital), not their
     // selling price — you never realized the sale. So value the write-off at
     // the product's cost price. This snapshots the cost at disposal time onto
@@ -43,15 +55,17 @@ export class DisposalsService {
 
     const disposal = await this.prisma.$transaction(async (tx) => {
       const quantityAfter = await this.reserveStock(
-        tx, branchId, product.id, product.name, dto.quantity,
+        tx, branchId, product.id, variant?.id ?? null, product.name, dto.quantity,
       );
 
       const created = await tx.disposal.create({
         data: {
           branchId,
           productId: product.id,
+          variantId: variant?.id ?? null,
           productName: product.name,
           brandName: product.brand.name,
+          variantName: variant?.name ?? null,
           quantity: dto.quantity,
           unitPrice,
           value,
@@ -71,6 +85,7 @@ export class DisposalsService {
       await tx.stockMovement.create({
         data: {
           productId: product.id,
+          variantId: variant?.id ?? null,
           branchId,
           userId: actor.userId,
           type: 'DISPOSAL',
@@ -134,17 +149,16 @@ export class DisposalsService {
       // a 0-change line that stamps WHO approved and WHEN, keeping the activity
       // log a complete, transparent trail without double-counting the stock.
       if (disposal.productId) {
-        const inv = await tx.inventory.findUnique({
-          where: { productId_branchId: { productId: disposal.productId, branchId: disposal.branchId } },
-        });
+        const current = await this.readStock(tx, disposal.productId, disposal.variantId, disposal.branchId);
         await tx.stockMovement.create({
           data: {
             productId: disposal.productId,
+            variantId: disposal.variantId,
             branchId: disposal.branchId,
             userId: actor.userId,
             type: 'DISPOSAL',
             quantityChange: 0,
-            quantityAfter: inv?.quantity ?? 0,
+            quantityAfter: current,
             description: 'Disposal approved',
           },
         });
@@ -188,37 +202,21 @@ export class DisposalsService {
       }
 
       if (disposal.productId) {
-        // Restore the reserved stock. Use upsert so that if the branch's
-        // inventory row no longer exists (e.g. it was removed after the
-        // disposal was created), the stock is still returned by recreating
-        // the row — instead of an updateMany silently matching nothing and
-        // losing the stock.
-        const restored = await tx.inventory.upsert({
-          where: {
-            productId_branchId: {
-              productId: disposal.productId,
-              branchId: disposal.branchId,
-            },
-          },
-          create: {
-            productId: disposal.productId,
-            branchId: disposal.branchId,
-            quantity: disposal.quantity,
-          },
-          update: { quantity: { increment: disposal.quantity } },
-          select: { quantity: true },
-        });
+        // Restore the reserved stock (variant-aware). Recreates the row if it
+        // was removed while the disposal was pending, so stock is never lost.
+        const restoredQty = await this.restoreStock(tx, disposal);
 
         // Log the stock return so the activity trail shows the decline, who
         // did it, and when (mirrors the pending-dispose entry in create()).
         await tx.stockMovement.create({
           data: {
             productId: disposal.productId,
+            variantId: disposal.variantId,
             branchId: disposal.branchId,
             userId: actor.userId,
             type: 'RETURN',
             quantityChange: disposal.quantity,
-            quantityAfter: restored.quantity,
+            quantityAfter: restoredQty,
             description: 'Disposal declined — stock returned',
           },
         });
@@ -265,32 +263,19 @@ export class DisposalsService {
       // Only a PENDING disposal still has its reservation in effect — a
       // DECLINED one was already restored when it was declined.
       if (disposal.status === DisposalStatus.PENDING && disposal.productId) {
-        const restored = await tx.inventory.upsert({
-          where: {
-            productId_branchId: {
-              productId: disposal.productId,
-              branchId: disposal.branchId,
-            },
-          },
-          create: {
-            productId: disposal.productId,
-            branchId: disposal.branchId,
-            quantity: disposal.quantity,
-          },
-          update: { quantity: { increment: disposal.quantity } },
-          select: { quantity: true },
-        });
+        const restoredQty = await this.restoreStock(tx, disposal);
 
         // Log the stock return so deleting a pending disposal is also visible
         // in the activity trail (who/when), consistent with decline().
         await tx.stockMovement.create({
           data: {
             productId: disposal.productId,
+            variantId: disposal.variantId,
             branchId: disposal.branchId,
             userId: actor.userId,
             type: 'RETURN',
             quantityChange: disposal.quantity,
-            quantityAfter: restored.quantity,
+            quantityAfter: restoredQty,
             description: 'Pending disposal deleted — stock returned',
           },
         });
@@ -321,9 +306,32 @@ export class DisposalsService {
     tx: Prisma.TransactionClient,
     branchId: string,
     productId: string,
+    variantId: string | null,
     productName: string,
     quantity: number,
   ): Promise<number> {
+    // Variant items decrement variant_inventory (keyed by variant+branch);
+    // simple items decrement inventory (keyed by product+branch).
+    if (variantId) {
+      const result = await tx.variantInventory.updateMany({
+        where: { variantId, branchId, quantity: { gte: quantity } },
+        data: { quantity: { decrement: quantity } },
+      });
+      if (result.count === 0) {
+        const vi = await tx.variantInventory.findUnique({
+          where: { variantId_branchId: { variantId, branchId } },
+        });
+        throw new BadRequestException(
+          `Insufficient stock to dispose "${productName}" (need ${quantity}, have ${vi?.quantity ?? 0})`,
+        );
+      }
+      const vi = await tx.variantInventory.findUnique({
+        where: { variantId_branchId: { variantId, branchId } },
+        select: { quantity: true },
+      });
+      return vi?.quantity ?? 0;
+    }
+
     const result = await tx.inventory.updateMany({
       where: { productId, branchId, quantity: { gte: quantity } },
       data: { quantity: { decrement: quantity } },
@@ -335,6 +343,60 @@ export class DisposalsService {
       throw new BadRequestException(
         `Insufficient stock to dispose "${productName}" (need ${quantity}, have ${inv?.quantity ?? 0})`,
       );
+    }
+    const inv = await tx.inventory.findUnique({
+      where: { productId_branchId: { productId, branchId } },
+      select: { quantity: true },
+    });
+    return inv?.quantity ?? 0;
+  }
+
+  /**
+   * Restore (increment) a disposal's reserved stock, variant-aware. Upserts so
+   * the row is recreated if it was removed while the disposal was pending —
+   * stock is never lost. Returns the new quantity for the movement log.
+   */
+  private async restoreStock(
+    tx: Prisma.TransactionClient,
+    disposal: { productId: string | null; variantId: string | null; branchId: string; quantity: number },
+  ): Promise<number> {
+    if (!disposal.productId) return 0;
+    if (disposal.variantId) {
+      const restored = await tx.variantInventory.upsert({
+        where: { variantId_branchId: { variantId: disposal.variantId, branchId: disposal.branchId } },
+        create: {
+          productId: disposal.productId,
+          variantId: disposal.variantId,
+          branchId: disposal.branchId,
+          quantity: disposal.quantity,
+        },
+        update: { quantity: { increment: disposal.quantity } },
+        select: { quantity: true },
+      });
+      return restored.quantity;
+    }
+    const restored = await tx.inventory.upsert({
+      where: { productId_branchId: { productId: disposal.productId, branchId: disposal.branchId } },
+      create: { productId: disposal.productId, branchId: disposal.branchId, quantity: disposal.quantity },
+      update: { quantity: { increment: disposal.quantity } },
+      select: { quantity: true },
+    });
+    return restored.quantity;
+  }
+
+  /** Read current stock for a product or variant at a branch (0 if none). */
+  private async readStock(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    variantId: string | null,
+    branchId: string,
+  ): Promise<number> {
+    if (variantId) {
+      const vi = await tx.variantInventory.findUnique({
+        where: { variantId_branchId: { variantId, branchId } },
+        select: { quantity: true },
+      });
+      return vi?.quantity ?? 0;
     }
     const inv = await tx.inventory.findUnique({
       where: { productId_branchId: { productId, branchId } },
@@ -481,8 +543,10 @@ export class DisposalsService {
       id: d.id,
       branch: d.branch ? { id: d.branch.id, name: d.branch.name } : null,
       productId: d.productId,
+      variantId: d.variantId ?? null,
       name: d.productName,
       brandName: d.brandName,
+      variantName: d.variantName ?? null,
       quantity: d.quantity,
       unitPrice: Number(d.unitPrice),
       // Cost-based value (snapshotted at disposal time). Confidential — used by
