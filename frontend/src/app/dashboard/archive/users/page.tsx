@@ -33,7 +33,7 @@ export default function UsersArchivePage() {
   };
 
   return (
-    <div className="p-6 bg-page-bg min-h-screen">
+    <div className="p-6 min-h-screen">
       <h1 className="text-2xl font-bold text-text-primary mb-6">Users Archive</h1>
       {actionError && <div className="mb-4 rounded-lg bg-accent-red/10 border border-accent-red/30 px-4 py-2 text-sm text-accent-red">{actionError}</div>}
 

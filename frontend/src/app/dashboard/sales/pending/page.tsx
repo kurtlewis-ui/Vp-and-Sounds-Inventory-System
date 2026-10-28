@@ -357,7 +357,7 @@ export default function SalesPendingPage() {
   const draftBusy = saveDraftForStaff.isPending || clearStaffDraft.isPending || clearAllDrafts.isPending;
 
   return (
-    <div className="p-6 bg-page-bg min-h-screen">
+    <div className="p-6 min-h-screen">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-text-primary">Pending Sales</h1>
         <div className="flex flex-wrap items-center gap-2">

@@ -77,7 +77,7 @@ export default function SalesRecordsPage() {
   };
 
   return (
-    <div className="p-6 bg-page-bg min-h-screen">
+    <div className="p-6 min-h-screen">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-text-primary">Sales Records</h1>
         <button onClick={clearFilters} className="px-4 py-2 border border-input-border rounded-lg text-sm text-text-primary hover:opacity-80 transition">

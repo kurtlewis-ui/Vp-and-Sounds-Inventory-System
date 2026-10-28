@@ -36,7 +36,7 @@ export default function ActivityLogsPage() {
   function resetToFirstPage() { setCurrentPage(1); }
 
   return (
-    <div className="p-6 bg-page-bg min-h-screen">
+    <div className="p-6 min-h-screen">
       <h1 className="text-2xl font-bold text-text-primary mb-6">Activity Logs</h1>
 
       {/* Category Tabs */}

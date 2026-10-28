@@ -46,7 +46,7 @@ export default function BranchProductsArchivePage() {
   };
 
   return (
-    <div className="p-6 bg-page-bg min-h-screen">
+    <div className="p-6 min-h-screen">
       <h1 className="text-2xl font-bold text-text-primary mb-1">Branch Product Archive</h1>
       <p className="text-sm text-text-muted mb-6">Products removed from a single shop. Restore brings a product back into that shop (its kept stock reappears).</p>
       {actionError && <div className="mb-4 rounded-lg bg-accent-red/10 border border-accent-red/30 px-4 py-2 text-sm text-accent-red">{actionError}</div>}

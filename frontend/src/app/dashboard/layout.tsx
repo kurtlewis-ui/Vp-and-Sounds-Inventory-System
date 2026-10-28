@@ -364,8 +364,33 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
+      {/* Centered, FIXED logo watermark behind the content area. Only shown to
+          Owner and Admin (not Viewer). Sits in the content column (offset past
+          the 240px sidebar on desktop), stays put while the page scrolls, and
+          never intercepts clicks (pointer-events-none). Kept very faint so it
+          reads as an elegant brand watermark without hurting legibility. In
+          light mode the chrome logo is lightened (brightness/invert) so it
+          stays a soft light wash on the white canvas instead of a dark blob. */}
+      {(user?.role?.name === 'Owner' || user?.role?.name === 'Admin') && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden lg:left-[240px]"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt=""
+            className={`w-[min(70vw,620px)] max-w-none object-contain select-none ${
+              contentTheme === 'light'
+                ? 'opacity-[0.04] [filter:grayscale(1)_brightness(1.9)]'
+                : 'opacity-[0.05]'
+            }`}
+          />
+        </div>
+      )}
+
       {/* Main content area — offset by sidebar width, applies theme */}
-      <div className={`lg:ml-[240px] flex-1 flex flex-col min-h-screen content-transition ${contentTheme === 'light' ? 'content-light' : ''}`}>
+      <div className={`relative z-10 lg:ml-[240px] flex-1 flex flex-col min-h-screen content-transition ${contentTheme === 'light' ? 'content-light' : ''}`}>
         {/* Top bar (mobile only). Uses the same solid navy as the sidebar
             (bg-nav-bg) so the header and side nav read as one surface. */}
         <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 bg-nav-bg border-b border-nav-border lg:hidden">
@@ -392,7 +417,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             desktop view felt cramped while mobile/tablet were fine). Wider max
             width and more horizontal padding step up at lg/xl; small screens
             are unchanged. */}
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 max-w-[1200px] xl:max-w-[1440px] w-full mx-auto bg-page-bg">{children}</main>
+        {/* Background is intentionally transparent (not bg-page-bg) so the
+            fixed brand watermark behind this column shows through the gutters
+            between cards. The root canvas still paints the base page color. */}
+        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 max-w-[1200px] xl:max-w-[1440px] w-full mx-auto">{children}</main>
       </div>
     </div>
   );

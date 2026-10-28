@@ -133,7 +133,7 @@ function AdminStaffView() {
   };
 
   return (
-    <div className="p-6 bg-page-bg min-h-screen">
+    <div className="p-6 min-h-screen">
       <div className="mb-6 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-text-muted font-medium uppercase tracking-wider">Manage</p>
@@ -697,7 +697,7 @@ function OwnerUsersView() {
   );
 
   return (
-    <div className="p-6 bg-page-bg min-h-screen">
+    <div className="p-6 min-h-screen">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-text-primary">Users</h1>
         <button onClick={handleAdd} className="flex items-center gap-2 btn-grad px-4 py-2 rounded-lg font-medium">
