@@ -243,7 +243,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <span className="logo-shimmer block h-9 w-9 overflow-hidden rounded-full ring-2 ring-white/80 shrink-0">
             <img src="/logo.png" alt="Vape and Sounds" className="block h-full w-full object-cover rounded-full" />
           </span>
-          <div className="leading-tight">
+          <div className="leading-tight text-center">
             <p className="text-base font-bold text-white">Vape and Sounds</p>
             <p className="text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</p>
           </div>
@@ -414,7 +414,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <span className="logo-shimmer block h-9 w-9 overflow-hidden rounded-full ring-2 ring-white/80 shrink-0">
               <img src="/logo.png" alt="Vape and Sounds" className="block h-full w-full object-cover rounded-full" />
             </span>
-            <div className="leading-tight text-left">
+            <div className="leading-tight text-center">
               <span className="block text-base font-bold text-white">Vape and Sounds</span>
               <span className="block text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</span>
             </div>
