@@ -18,6 +18,14 @@ function peso(n: number | null | undefined) {
   return `\u20B1${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+type StaffVariant = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  totalQuantity: number;
+  quantities: { branchId: string; quantity: number }[];
+};
+
 type StaffProduct = {
   id: string;
   name: string;
@@ -25,6 +33,8 @@ type StaffProduct = {
   sellingPrice: number;
   totalQuantity: number;
   brand: { id: string; name: string } | null;
+  variantType: 'none' | 'flavor' | 'color';
+  variants: StaffVariant[];
 };
 
 export default function BrandProductsPage() {
@@ -197,6 +207,9 @@ function AddPurchaseModal({
 }) {
   const [quantity, setQuantity] = useState('1');
   const [discount, setDiscount] = useState('');
+  // Selected flavor/color (only for variant products). Empty until chosen.
+  const hasVariants = product.variantType !== 'none' && (product.variants?.length ?? 0) > 0;
+  const [selectedVariantId, setSelectedVariantId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<ItemPaymentMethod | ''>('');
   const [splitCash, setSplitCash] = useState('');
   const [splitGcash, setSplitGcash] = useState('');
@@ -215,14 +228,23 @@ function AddPurchaseModal({
   const draftItems = useDraftStore((s) => s.items);
   const draftDisposalItems = useDraftStore((s) => s.disposalItems);
 
+  const selectedVariant = hasVariants
+    ? product.variants.find((v) => v.id === selectedVariantId) ?? null
+    : null;
+
   // Units already staged in the draft — whether to sell or to dispose —
   // don't come off the server's stock count until the draft is actually
   // submitted, so both must be subtracted here or staff could stage more
-  // than actually exists.
+  // than actually exists. For variant products this is scoped to the SELECTED
+  // flavor/color; for simple products, to the product.
+  const matchesLine = (i: { productId: string; variantId?: string | null }) =>
+    i.productId === product.id && (hasVariants ? (i.variantId ?? null) === (selectedVariantId || null) : true);
   const alreadyInCart =
-    (draftItems.find((i) => i.productId === product.id)?.quantity ?? 0) +
-    (draftDisposalItems.find((i) => i.productId === product.id)?.quantity ?? 0);
-  const stock = product.totalQuantity;
+    draftItems.filter(matchesLine).reduce((s, i) => s + i.quantity, 0) +
+    draftDisposalItems.filter(matchesLine).reduce((s, i) => s + i.quantity, 0);
+  // Stock: the selected variant's total (branch-scoped) for variant products,
+  // else the product's branch total.
+  const stock = hasVariants ? (selectedVariant?.totalQuantity ?? 0) : product.totalQuantity;
   const available = Math.max(0, stock - alreadyInCart);
 
   const qtyNumber = Number(quantity) || 0;
@@ -244,6 +266,10 @@ function AddPurchaseModal({
   const splitMismatch = Math.abs(splitRemainder) > 0.01;
 
   function validQty(): number | null {
+    if (hasVariants && !selectedVariantId) {
+      setError(`Please choose a ${product.variantType === 'color' ? 'color' : 'flavor'} first.`);
+      return null;
+    }
     const qty = Number(quantity);
     if (!qty || qty < 1) { setError('Enter a quantity of at least 1.'); return null; }
     if (qty > available) {
@@ -277,6 +303,8 @@ function AddPurchaseModal({
     addItem(
       {
         productId: product.id,
+        variantId: selectedVariant?.id ?? null,
+        variantName: selectedVariant?.name ?? null,
         name: product.name,
         brandName: product.brand?.name ?? '',
         unitPrice: product.sellingPrice,
@@ -297,7 +325,8 @@ function AddPurchaseModal({
       qty,
     );
     setDirty(false);
-    onSaved(`Added ${qty}× ${product.name} to your draft order.`);
+    const label = selectedVariant ? `${product.name} (${selectedVariant.name})` : product.name;
+    onSaved(`Added ${qty}× ${label} to your draft order.`);
   }
 
   function handleDispose() {
@@ -312,6 +341,8 @@ function AddPurchaseModal({
     addDisposalItem(
       {
         productId: product.id,
+        variantId: selectedVariant?.id ?? null,
+        variantName: selectedVariant?.name ?? null,
         name: product.name,
         brandName: product.brand?.name ?? '',
         reason: combinedReason,
@@ -319,7 +350,8 @@ function AddPurchaseModal({
       qty,
     );
     setDirty(false);
-    onSaved(`Added ${qty}× ${product.name} to your draft order's Dispose list.`);
+    const label = selectedVariant ? `${product.name} (${selectedVariant.name})` : product.name;
+    onSaved(`Added ${qty}× ${label} to your draft order's Dispose list.`);
   }
 
   return (
@@ -354,6 +386,44 @@ function AddPurchaseModal({
         </div>
 
         <div className="space-y-5" onInput={() => setDirty(true)}>
+          {/* Flavor / Color picker — only for variant products. Each option
+              shows its own available stock; out-of-stock flavors are disabled. */}
+          {hasVariants && (
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                {product.variantType === 'color' ? 'Color' : 'Flavor'}
+              </label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {product.variants.filter((v) => v.isActive).map((v) => {
+                  const out = v.totalQuantity <= 0;
+                  const active = selectedVariantId === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      disabled={out}
+                      onClick={() => { setSelectedVariantId(v.id); setQuantity('1'); setDirty(true); }}
+                      className={`rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                        active
+                          ? 'bg-btn-primary text-btn-primary-text shadow-md'
+                          : out
+                            ? 'border-2 border-input-border text-text-muted opacity-50 cursor-not-allowed'
+                            : 'border-2 border-input-border text-text-primary hover:border-btn-primary'
+                      }`}
+                      title={out ? 'Out of stock' : `${v.totalQuantity} in stock`}
+                    >
+                      {v.name}
+                      <span className="ml-1 text-[10px] font-normal opacity-70">({v.totalQuantity})</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {!selectedVariantId && (
+                <p className="mt-1 text-[11px] text-text-muted">Choose a {product.variantType === 'color' ? 'color' : 'flavor'} to continue.</p>
+              )}
+            </div>
+          )}
+
           {/* Quantity */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">Quantity</label>

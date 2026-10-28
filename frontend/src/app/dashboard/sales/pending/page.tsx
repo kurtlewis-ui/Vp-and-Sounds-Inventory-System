@@ -486,7 +486,7 @@ export default function SalesPendingPage() {
                         )}
                       </td>
                       <td className="px-4 py-4"><ProductThumb src={item.image} alt={item.name} /></td>
-                      <td className="px-4 py-4 text-sm text-text-primary">{item.name}</td>
+                      <td className="px-4 py-4 text-sm text-text-primary">{item.name}{item.variantName ? <span className="text-text-secondary"> · {item.variantName}</span> : null}</td>
                       <td className="px-4 py-4 text-sm text-text-primary">{item.quantity}</td>
                       <td className="px-4 py-4 text-sm text-text-secondary">{item.brandName}</td>
                       <td className="px-4 py-4 text-sm text-text-primary">{peso(item.unitPrice)}</td>
@@ -557,7 +557,7 @@ export default function SalesPendingPage() {
                             <ProductThumb src={item.image} alt={item.name} size="w-9 h-9" />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-2">
-                                <span className="min-w-0 font-medium text-text-primary break-words">{item.name}</span>
+                                <span className="min-w-0 font-medium text-text-primary break-words">{item.name}{item.variantName ? <span className="text-text-secondary"> · {item.variantName}</span> : null}</span>
                                 <span className="shrink-0 font-medium text-text-primary">{peso(item.subTotal)}</span>
                               </div>
                               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-text-muted">

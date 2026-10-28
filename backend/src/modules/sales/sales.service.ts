@@ -59,7 +59,11 @@ export class SalesService {
       );
     }
 
-    const items = this.buildSaleItems(dto.items, productMap, branchPriceMap);
+    // Load any referenced variants (flavors/colors) so we can snapshot their
+    // names and validate each belongs to its product.
+    const variantMap = await this.loadVariantMap(dto.items);
+
+    const items = this.buildSaleItems(dto.items, productMap, branchPriceMap, variantMap);
 
     const total = items.reduce(
       (sum, i) => sum.add(i.subTotal),
@@ -334,8 +338,9 @@ export class SalesService {
       const branchPriceMap = new Map(
         products.map((p) => [p.id, p.inventory[0]?.sellingPrice ?? null]),
       );
+      const variantMap = await this.loadVariantMap(dto.items);
 
-      newItems = this.buildSaleItems(dto.items, productMap, branchPriceMap);
+      newItems = this.buildSaleItems(dto.items, productMap, branchPriceMap, variantMap);
       data.total = newItems.reduce(
         (sum, i) => sum.add(i.subTotal),
         new Prisma.Decimal(0),
@@ -465,12 +470,20 @@ export class SalesService {
    * of the product's global default.
    */
   private buildSaleItems(
-    dtoItems: { productId: string; quantity: number; discount?: number; paymentMethod: PaymentMethod; bankNote?: string; note?: string; paymentSplit?: { cash: number; gcash: number; bpi: number; bdo: number }; addedAt?: string }[],
+    dtoItems: { productId: string; variantId?: string; quantity: number; discount?: number; paymentMethod: PaymentMethod; bankNote?: string; note?: string; paymentSplit?: { cash: number; gcash: number; bpi: number; bdo: number }; addedAt?: string }[],
     productMap: Map<string, { id: string; name: string; sellingPrice: Prisma.Decimal; costPrice?: Prisma.Decimal; brand: { name: string } }>,
     branchPriceMap?: Map<string, Prisma.Decimal | null>,
+    variantMap?: Map<string, { id: string; name: string; productId: string }>,
   ) {
     return dtoItems.map((item) => {
       const product = productMap.get(item.productId)!;
+      const variant = item.variantId ? variantMap?.get(item.variantId) : undefined;
+      if (item.variantId && !variant) {
+        throw new BadRequestException(`Selected flavor/variant is no longer available for "${product.name}".`);
+      }
+      if (variant && variant.productId !== product.id) {
+        throw new BadRequestException(`Flavor/variant mismatch for "${product.name}".`);
+      }
       const branchPrice = branchPriceMap?.get(item.productId);
       const unitPrice = new Prisma.Decimal(
         branchPrice != null ? branchPrice : product.sellingPrice,
@@ -486,8 +499,10 @@ export class SalesService {
       const subTotal = lineTotal.sub(discount);
       return {
         productId: product.id,
+        variantId: variant?.id ?? null,
         name: product.name,
         brandName: product.brand.name,
+        variantName: variant?.name ?? null,
         quantity: item.quantity,
         unitPrice,
         costPrice,
@@ -499,6 +514,21 @@ export class SalesService {
         ...this.resolveItemPayment(item, subTotal, product.name),
       };
     });
+  }
+
+  /**
+   * Load referenced variants (flavors/colors) into a map keyed by variantId,
+   * validating each exists and isn't deleted. Used to snapshot variant names
+   * onto sale items and to confirm the variant belongs to its product.
+   */
+  private async loadVariantMap(items: { variantId?: string }[]) {
+    const variantIds = [...new Set(items.map((i) => i.variantId).filter((v): v is string => !!v))];
+    if (variantIds.length === 0) return new Map<string, { id: string; name: string; productId: string }>();
+    const variants = await this.prisma.productVariant.findMany({
+      where: { id: { in: variantIds }, deletedAt: null },
+      select: { id: true, name: true, productId: true },
+    });
+    return new Map(variants.map((v) => [v.id, v]));
   }
 
   /**
@@ -569,7 +599,7 @@ export class SalesService {
   private async reserveStock(
     tx: Prisma.TransactionClient,
     branchId: string,
-    items: { productId: string | null; name: string; quantity: number }[],
+    items: { productId: string | null; variantId?: string | null; name: string; quantity: number }[],
     userId?: string,
   ) {
     // Perf: previously this did 3 sequential DB round-trips PER item inside the
@@ -590,28 +620,45 @@ export class SalesService {
     for (const item of items) {
       if (!item.productId) continue;
 
-      const rows = await tx.$queryRaw<{ quantity: number }[]>(Prisma.sql`
-        UPDATE "inventory"
-        SET "quantity" = "quantity" - ${item.quantity}, "updated_at" = NOW()
-        WHERE "product_id" = ${item.productId}::uuid
-          AND "branch_id" = ${branchId}::uuid
-          AND "quantity" >= ${item.quantity}
-        RETURNING "quantity"
-      `);
+      // Variant items decrement variant_inventory (keyed by variant+branch);
+      // simple items decrement inventory (keyed by product+branch). Both use a
+      // conditional `UPDATE ... RETURNING` so they can't oversell concurrently.
+      const rows = item.variantId
+        ? await tx.$queryRaw<{ quantity: number }[]>(Prisma.sql`
+            UPDATE "variant_inventory"
+            SET "quantity" = "quantity" - ${item.quantity}, "updated_at" = NOW()
+            WHERE "variant_id" = ${item.variantId}::uuid
+              AND "branch_id" = ${branchId}::uuid
+              AND "quantity" >= ${item.quantity}
+            RETURNING "quantity"
+          `)
+        : await tx.$queryRaw<{ quantity: number }[]>(Prisma.sql`
+            UPDATE "inventory"
+            SET "quantity" = "quantity" - ${item.quantity}, "updated_at" = NOW()
+            WHERE "product_id" = ${item.productId}::uuid
+              AND "branch_id" = ${branchId}::uuid
+              AND "quantity" >= ${item.quantity}
+            RETURNING "quantity"
+          `);
 
       if (rows.length === 0) {
         // Either no inventory row, or not enough stock. Read the current amount
         // (only on the failure path) to give a precise error message.
-        const inv = await tx.inventory.findUnique({
-          where: { productId_branchId: { productId: item.productId, branchId } },
-        });
+        const have = item.variantId
+          ? (await tx.variantInventory.findUnique({
+              where: { variantId_branchId: { variantId: item.variantId, branchId } },
+            }))?.quantity ?? 0
+          : (await tx.inventory.findUnique({
+              where: { productId_branchId: { productId: item.productId, branchId } },
+            }))?.quantity ?? 0;
         throw new BadRequestException(
-          `Insufficient stock for "${item.name}" (need ${item.quantity}, have ${inv?.quantity ?? 0})`,
+          `Insufficient stock for "${item.name}" (need ${item.quantity}, have ${have})`,
         );
       }
 
       movements.push({
         productId: item.productId,
+        variantId: item.variantId ?? null,
         branchId,
         userId: userId ?? null,
         type: 'SALE' as const,
@@ -630,7 +677,7 @@ export class SalesService {
   private async restoreStock(
     tx: Prisma.TransactionClient,
     branchId: string,
-    items: { productId: string | null; quantity: number }[],
+    items: { productId: string | null; variantId?: string | null; quantity: number }[],
     userId?: string,
   ) {
     // Perf mirror of reserveStock: was 2-3 round-trips per item (upsert +
@@ -648,16 +695,25 @@ export class SalesService {
     for (const item of items) {
       if (!item.productId) continue;
 
-      const rows = await tx.$queryRaw<{ quantity: number }[]>(Prisma.sql`
-        INSERT INTO "inventory" ("id", "product_id", "branch_id", "quantity", "updated_at")
-        VALUES (gen_random_uuid(), ${item.productId}::uuid, ${branchId}::uuid, ${item.quantity}, NOW())
-        ON CONFLICT ("product_id", "branch_id")
-        DO UPDATE SET "quantity" = "inventory"."quantity" + ${item.quantity}, "updated_at" = NOW()
-        RETURNING "quantity"
-      `);
+      const rows = item.variantId
+        ? await tx.$queryRaw<{ quantity: number }[]>(Prisma.sql`
+            INSERT INTO "variant_inventory" ("id", "product_id", "variant_id", "branch_id", "quantity", "updated_at")
+            VALUES (gen_random_uuid(), ${item.productId}::uuid, ${item.variantId}::uuid, ${branchId}::uuid, ${item.quantity}, NOW())
+            ON CONFLICT ("variant_id", "branch_id")
+            DO UPDATE SET "quantity" = "variant_inventory"."quantity" + ${item.quantity}, "updated_at" = NOW()
+            RETURNING "quantity"
+          `)
+        : await tx.$queryRaw<{ quantity: number }[]>(Prisma.sql`
+            INSERT INTO "inventory" ("id", "product_id", "branch_id", "quantity", "updated_at")
+            VALUES (gen_random_uuid(), ${item.productId}::uuid, ${branchId}::uuid, ${item.quantity}, NOW())
+            ON CONFLICT ("product_id", "branch_id")
+            DO UPDATE SET "quantity" = "inventory"."quantity" + ${item.quantity}, "updated_at" = NOW()
+            RETURNING "quantity"
+          `);
 
       movements.push({
         productId: item.productId,
+        variantId: item.variantId ?? null,
         branchId,
         userId: userId ?? null,
         type: 'RETURN' as const,
@@ -762,8 +818,10 @@ export class SalesService {
       items: (sale.items ?? []).map((i: any) => ({
         id: i.id,
         productId: i.productId,
+        variantId: i.variantId ?? null,
         name: i.name,
         brandName: i.brandName,
+        variantName: i.variantName ?? null,
         quantity: i.quantity,
         unitPrice: Number(i.unitPrice),
         discount: Number(i.discount ?? 0),

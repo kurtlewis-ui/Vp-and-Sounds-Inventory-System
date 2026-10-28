@@ -63,6 +63,11 @@ export class SaleItemInputDto {
   @Min(0)
   discount?: number;
 
+  @ApiProperty({ required: false, description: 'Variant (flavor/color) ID when the product has variants' })
+  @IsOptional()
+  @IsUUID()
+  variantId?: string;
+
   @ApiProperty({ enum: PaymentMethod, example: 'Cash', description: 'How this item was paid for' })
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;

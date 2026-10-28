@@ -189,8 +189,11 @@ export default function StaffDailyReportPage() {
     const map = new Map<string, { name: string; brandName: string; quantity: number; total: number }>();
     for (const sale of allSales) {
       for (const item of sale.items) {
-        const key = `${item.name}__${item.brandName}`;
-        const cur = map.get(key) ?? { name: item.name, brandName: item.brandName, quantity: 0, total: 0 };
+        // Group by product + variant so each flavor/color is counted on its
+        // own row; the displayed name includes the variant when present.
+        const displayName = item.variantName ? `${item.name} · ${item.variantName}` : item.name;
+        const key = `${displayName}__${item.brandName}`;
+        const cur = map.get(key) ?? { name: displayName, brandName: item.brandName, quantity: 0, total: 0 };
         cur.quantity += item.quantity;
         cur.total += item.subTotal;
         map.set(key, cur);
@@ -292,7 +295,7 @@ export default function StaffDailyReportPage() {
                       </td>
                       <td className="px-4 py-3"><ProductThumb src={item.image} alt={item.name} /></td>
                       <td className="px-4 py-3 text-sm text-text-primary">
-                        {item.name}
+                        {item.name}{item.variantName ? <span className="text-text-secondary"> · {item.variantName}</span> : null}
                         {item.note && <p className="text-[10px] text-text-muted italic mt-0.5">{item.note}</p>}
                       </td>
                       <td className="px-4 py-3 text-sm text-text-primary">{item.quantity}</td>
@@ -426,7 +429,7 @@ export default function StaffDailyReportPage() {
                           <ProductThumb src={item.image} alt={item.name} size="w-9 h-9" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-2">
-                              <span className="min-w-0 font-medium text-text-primary break-words">{item.name}</span>
+                              <span className="min-w-0 font-medium text-text-primary break-words">{item.name}{item.variantName ? <span className="text-text-secondary"> · {item.variantName}</span> : null}</span>
                               <span className="shrink-0 font-medium text-text-primary">{peso(item.subTotal)}</span>
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-text-muted">

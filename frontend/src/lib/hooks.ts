@@ -564,6 +564,58 @@ export function useRestoreProduct() {
   });
 }
 
+// ---- Product variants (flavors / colors) ----------------------------------
+
+import type { ProductVariant } from './types';
+
+// A product's variants with per-branch stock. Returns the full refreshed list
+// after any mutation (the API echoes the product's variants).
+export function useProductVariants(productId: string | null | undefined, branchId?: string) {
+  return useQuery({
+    queryKey: ['product-variants', { productId, branchId }],
+    enabled: !!productId,
+    queryFn: () =>
+      api
+        .get(`/products/${productId}/variants`, { params: { branchId: branchId || undefined } })
+        .then((r) => r.data.data as ProductVariant[]),
+  });
+}
+
+export function useCreateVariant() {
+  const invalidate = useInvalidate();
+  const t = useMutationToasts('Flavor/variant added');
+  return useMutation({
+    mutationFn: ({ productId, name, quantities, variantType }: { productId: string; name: string; quantities?: { branchId: string; quantity: number }[]; variantType?: 'flavor' | 'color' }) =>
+      api
+        .post(`/products/${productId}/variants`, { name, quantities }, { params: { variantType } })
+        .then((r) => r.data.data as ProductVariant[]),
+    onSuccess: () => { invalidate(['product-variants'], ['products'], ['product'], ['stats']); t.onSuccess(); },
+    onError: t.onError,
+  });
+}
+
+export function useUpdateVariant() {
+  const invalidate = useInvalidate();
+  const t = useMutationToasts('Flavor/variant renamed');
+  return useMutation({
+    mutationFn: ({ variantId, name }: { variantId: string; name: string }) =>
+      api.patch(`/products/variants/${variantId}`, { name }).then((r) => r.data.data as ProductVariant[]),
+    onSuccess: () => { invalidate(['product-variants'], ['products'], ['product']); t.onSuccess(); },
+    onError: t.onError,
+  });
+}
+
+export function useRemoveVariant() {
+  const invalidate = useInvalidate();
+  const t = useMutationToasts('Flavor/variant removed');
+  return useMutation({
+    mutationFn: (variantId: string) =>
+      api.delete(`/products/variants/${variantId}`).then((r) => r.data.data as ProductVariant[]),
+    onSuccess: () => { invalidate(['product-variants'], ['products'], ['product'], ['stats']); t.onSuccess(); },
+    onError: t.onError,
+  });
+}
+
 // ---- Per-branch product archive -------------------------------------------
 // "Remove" a product from ONE branch only (keeps it active in the others).
 
