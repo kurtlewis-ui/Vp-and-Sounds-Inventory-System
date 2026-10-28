@@ -80,7 +80,7 @@ export default function LoginPage() {
             as Daily Smokz). The .logo-shimmer class (globals.css) animates a
             diagonal white gradient across the logo on hover. Rounded square so
             the logo's own black background blends into the page edge. */}
-        <div className="mb-10 logo-shimmer rounded-3xl shadow-2xl shadow-black/50 ring-1 ring-white/10">
+        <div className="mb-10 logo-shimmer rounded-3xl shadow-2xl shadow-black/50 ring-[3px] ring-white/70">
           <img
             src="/logo.png"
             alt="Vape and Sounds"
