@@ -76,12 +76,15 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute -top-32 left-1/2 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-white/[0.03] blur-3xl" />
 
       <div className="relative flex w-full max-w-[420px] flex-col items-center">
-        {/* Logo badge. Sized large on the login screen. */}
-        <div className="mb-10">
+        {/* Logo — large with white-slice shimmer sweep on hover (same effect
+            as Daily Smokz). The .logo-shimmer class (globals.css) animates a
+            diagonal white gradient across the logo on hover. Rounded square so
+            the logo's own black background blends into the page edge. */}
+        <div className="mb-10 logo-shimmer rounded-3xl shadow-2xl shadow-black/50 ring-1 ring-white/10">
           <img
-            src="/logo.svg"
-            alt="Inventory System"
-            className="h-[128px] w-[128px] sm:h-[152px] sm:w-[152px] object-contain"
+            src="/logo.png"
+            alt="Vape and Sounds"
+            className="h-[180px] w-[180px] sm:h-[220px] sm:w-[220px] object-contain rounded-3xl"
           />
         </div>
 

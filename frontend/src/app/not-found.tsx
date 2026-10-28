@@ -10,7 +10,7 @@ export default function NotFound() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-page-bg px-6 text-center">
       {/* Box/package logo via the lucide icon so it's theme-aware (inherits
           text-text-primary) on this page's light-or-dark background. */}
-      <Package className="mb-6 h-16 w-16 text-text-primary" strokeWidth={1.6} aria-label="CHX Inventory System" />
+      <Package className="mb-6 h-16 w-16 text-text-primary" strokeWidth={1.6} aria-label="Vape and Sounds" />
       <p className="text-6xl font-black tracking-tight text-text-primary">404</p>
       <h1 className="mt-2 text-xl font-bold text-text-primary">Page not found</h1>
       <p className="mt-2 max-w-sm text-sm text-text-secondary">

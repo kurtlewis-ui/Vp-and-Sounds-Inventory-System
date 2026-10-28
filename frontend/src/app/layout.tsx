@@ -11,11 +11,11 @@ import { Providers } from './providers';
 // class, wired into Tailwind (font-sans / font-mono) and globals.css.
 
 export const metadata: Metadata = {
-  title: 'CHX Inventory System',
+  title: 'Vape and Sounds',
   description: 'Inventory and sales management dashboard',
   icons: {
-    icon: '/logo.svg',
-    apple: '/logo.svg',
+    icon: '/logo.png',
+    apple: '/logo.png',
   },
 };
 
