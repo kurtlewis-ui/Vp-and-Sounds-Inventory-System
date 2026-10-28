@@ -523,14 +523,15 @@ export default function StaffDailyReportPage() {
           );
         const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
         const totalDiscount = sales.reduce((sum, s) => sum + s.items.reduce((a, i) => a + (i.discount ?? 0), 0), 0);
-        // Each row gets a small ICON instead of a plain color dot: Cash is a
-        // green circle with a ₱ sign (CSS-made); Gcash/BDO/BPI use their brand
-        // logo images for fast recognition in the summary.
-        const rows: { label: string; value: number; icon: 'cash' | 'gcash' | 'bdo' | 'bpi' }[] = [
-          { label: 'Cash', value: methodTotal('Cash'), icon: 'cash' },
-          { label: 'Gcash', value: methodTotal('Gcash'), icon: 'gcash' },
-          { label: 'BDO', value: methodTotal('BDO'), icon: 'bdo' },
-          { label: 'BPI', value: methodTotal('BPI'), icon: 'bpi' },
+        // Each row gets a small, perfectly uniform CSS circle badge (same size,
+        // never clipped): a brand-colored disc with a single glyph. This avoids
+        // the inconsistent framing/padding of the logo PNGs.
+        //   Cash ₱ green · Gcash G blue · BDO B dark-blue · BPI B dark-red
+        const rows: { label: string; value: number; glyph: string; color: string }[] = [
+          { label: 'Cash', value: methodTotal('Cash'), glyph: '₱', color: '#15803d' },
+          { label: 'Gcash', value: methodTotal('Gcash'), glyph: 'G', color: '#2563eb' },
+          { label: 'BDO', value: methodTotal('BDO'), glyph: 'B', color: '#1e3a8a' },
+          { label: 'BPI', value: methodTotal('BPI'), glyph: 'B', color: '#7f1d1d' },
         ];
         return (
           <div className="mt-4 rounded-xl border border-card-border bg-card-bg p-4 shadow-sm">
@@ -546,31 +547,15 @@ export default function StaffDailyReportPage() {
               {rows.map((r) => (
                 <div key={r.label} className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-xs text-text-primary">
-                    {r.icon === 'cash' ? (
-                      <span
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold leading-none text-white"
-                        style={{ background: '#15803d' }}
-                        aria-hidden="true"
-                      >
-                        ₱
-                      </span>
-                    ) : (
-                      // Uniform badge: fixed 20px circle, logo scaled to fill it
-                      // identically (the logos already carry their own colored
-                      // circular background, so object-cover crops to the same
-                      // circle edge and all three read the same size).
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={`/payments/${r.icon}.png`}
-                          alt=""
-                          // object-contain shows each logo WHOLE (never clipping
-                          // the "O" / wordmark). The logos carry their own colored
-                          // circle, so the badge reads clean and consistent.
-                          className="h-full w-full object-contain"
-                        />
-                      </span>
-                    )}
+                    {/* Uniform CSS circle badge — identical size for every row,
+                        a brand-colored disc with one glyph, never clipped. */}
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold leading-none text-white"
+                      style={{ background: r.color }}
+                      aria-hidden="true"
+                    >
+                      {r.glyph}
+                    </span>
                     {r.label}
                   </span>
                   <span className="text-xs font-semibold tabular-nums text-text-primary">{peso(r.value)}</span>
