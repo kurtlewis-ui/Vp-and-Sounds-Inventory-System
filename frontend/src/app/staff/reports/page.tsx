@@ -547,19 +547,24 @@ export default function StaffDailyReportPage() {
                   <span className="flex items-center gap-2 text-xs text-text-primary">
                     {r.icon === 'cash' ? (
                       <span
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
                         style={{ background: '#15803d' }}
                         aria-hidden="true"
                       >
                         ₱
                       </span>
                     ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`/payments/${r.icon}.png`}
-                        alt=""
-                        className="h-5 w-5 shrink-0 rounded-full object-cover"
-                      />
+                      // Uniform 24px circular badge: the logo is centered and
+                      // fully contained (object-contain) on a white disc, so
+                      // Gcash/BDO/BPI all read the same size and never crop.
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/payments/${r.icon}.png`}
+                          alt=""
+                          className="h-full w-full object-contain"
+                        />
+                      </span>
                     )}
                     {r.label}
                   </span>
