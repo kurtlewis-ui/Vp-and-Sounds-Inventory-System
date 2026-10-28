@@ -523,15 +523,14 @@ export default function StaffDailyReportPage() {
           );
         const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
         const totalDiscount = sales.reduce((sum, s) => sum + s.items.reduce((a, i) => a + (i.discount ?? 0), 0), 0);
-        // Each row gets a small, perfectly uniform CSS circle badge (same size,
-        // never clipped): a brand-colored disc with a single glyph. This avoids
-        // the inconsistent framing/padding of the logo PNGs.
-        //   Cash ₱ green · Gcash G blue · BDO B dark-blue · BPI B dark-red
-        const rows: { label: string; value: number; glyph: string; color: string }[] = [
-          { label: 'Cash', value: methodTotal('Cash'), glyph: '₱', color: '#15803d' },
-          { label: 'Gcash', value: methodTotal('Gcash'), glyph: 'G', color: '#2563eb' },
-          { label: 'BDO', value: methodTotal('BDO'), glyph: 'B', color: '#1e3a8a' },
-          { label: 'BPI', value: methodTotal('BPI'), glyph: 'B', color: '#7f1d1d' },
+        // Cash uses a CSS green ₱ circle; Gcash/BDO/BPI use their real brand
+        // logo images. All badges share one fixed box and the logos are shown
+        // whole (object-contain) so none is ever clipped.
+        const rows: { label: string; value: number; icon: 'cash' | 'gcash' | 'bdo' | 'bpi' }[] = [
+          { label: 'Cash', value: methodTotal('Cash'), icon: 'cash' },
+          { label: 'Gcash', value: methodTotal('Gcash'), icon: 'gcash' },
+          { label: 'BDO', value: methodTotal('BDO'), icon: 'bdo' },
+          { label: 'BPI', value: methodTotal('BPI'), icon: 'bpi' },
         ];
         return (
           <div className="mt-4 rounded-xl border border-card-border bg-card-bg p-4 shadow-sm">
@@ -547,15 +546,27 @@ export default function StaffDailyReportPage() {
               {rows.map((r) => (
                 <div key={r.label} className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-xs text-text-primary">
-                    {/* Uniform CSS circle badge — identical size for every row,
-                        a brand-colored disc with one glyph, never clipped. */}
-                    <span
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold leading-none text-white"
-                      style={{ background: r.color }}
-                      aria-hidden="true"
-                    >
-                      {r.glyph}
-                    </span>
+                    {r.icon === 'cash' ? (
+                      <span
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold leading-none text-white"
+                        style={{ background: '#15803d' }}
+                        aria-hidden="true"
+                      >
+                        ₱
+                      </span>
+                    ) : (
+                      // Real brand logo. Fixed 24px box + object-contain shows
+                      // the whole logo (never clipped); the logos carry their
+                      // own colored circle, so all read at a consistent size.
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/payments/${r.icon}.png`}
+                          alt=""
+                          className="h-full w-full object-contain"
+                        />
+                      </span>
+                    )}
                     {r.label}
                   </span>
                   <span className="text-xs font-semibold tabular-nums text-text-primary">{peso(r.value)}</span>
