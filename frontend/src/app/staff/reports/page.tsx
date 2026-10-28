@@ -547,12 +547,16 @@ export default function StaffDailyReportPage() {
                 <div key={r.label} className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-xs text-text-primary">
                     {r.icon === 'cash' ? (
-                      <span
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold leading-none text-white"
-                        style={{ background: '#15803d' }}
-                        aria-hidden="true"
-                      >
-                        ₱
+                      // Smaller than the 24px logo box so the green disc reads
+                      // the same visual size as the contained bank logos (which
+                      // sit inside their own padding). Centered in a 24px slot.
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center" aria-hidden="true">
+                        <span
+                          className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[10px] font-bold leading-none text-white"
+                          style={{ background: '#15803d' }}
+                        >
+                          ₱
+                        </span>
                       </span>
                     ) : (
                       // Real brand logo. Fixed 24px box + object-contain shows
