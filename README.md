@@ -1,4 +1,4 @@
-# CHX Inventory System
+# Vape and Sounds — Inventory & Sales Management System
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
@@ -6,391 +6,189 @@
 [![NestJS](https://img.shields.io/badge/NestJS-10-red)](https://nestjs.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)](https://www.postgresql.org/)
 
-A comprehensive, production-ready management system for vape shops featuring inventory tracking, point-of-sale, reporting, and multi-user access control.
+A multi-branch inventory and point-of-sale system for the **Vape and Sounds**
+shop. Staff record sales on a simple POS; Admins and the Owner review, approve,
+and report on them. Prices and stock are tracked **per branch**, and images are
+stored on Cloudinary.
 
-## 🎯 Project Overview
+> This README describes what the app **actually does today**. Features are kept
+> intentionally lean — see [Features](#-features) for the real list.
 
-This system provides a complete solution for vape shop operations including:
+## 🎯 Overview
 
-- **Multi-user Access Control** - Owner, Admin, and Staff roles with granular permissions
-- **Product Management** - Full product catalog with variants, SKUs, and pricing
-- **Inventory Tracking** - Real-time inventory with automatic updates and low stock alerts
-- **Point of Sale** - Fast, intuitive checkout with age verification
-- **Purchase Orders** - Supplier management and inventory receiving
-- **Customer Management** - Customer profiles, purchase history, and loyalty tracking
-- **Reporting & Analytics** - Comprehensive reports and real-time dashboard
-- **Shift Management** - Cash drawer tracking and reconciliation
-- **Audit Logging** - Complete audit trail for compliance
-- **Real-time Updates** - WebSocket-based live updates across all clients
+- **Role-based access** — Owner, Admin, Staff, and a read-only Viewer role.
+- **Per-branch catalog & inventory** — each shop has its own stock levels and
+  can override a product's selling price; products/brands can be archived
+  globally or per branch.
+- **Point of Sale (POS)** — Staff build a draft order and submit it; each item
+  records its own payment method.
+- **Payment methods** — **Cash, GCash, BDO, BPI**, plus **Split** (one item
+  paid across several of those) and an automatic **Mixed** rollup label when a
+  sale's items don't all share one method.
+- **Approval workflow** — Sales, disposals, and expenses are submitted by Staff
+  and **approved/declined by an Admin/Owner**; stock moves on approval.
+- **Reporting** — Owner Profit & Loss (uses confidential cost prices on the
+  server), Admin cost-free Sales Summary, top-selling and most-disposed
+  products, and a per-branch daily report.
+- **Stock movement history** — every stock change (sale, restock, disposal,
+  return, adjustment) is logged per product per branch.
+- **Audit logging** — key actions are recorded for traceability.
+- **Image storage** — product/brand/avatar images upload to **Cloudinary**
+  (falls back to inline base64 if Cloudinary env vars aren't set).
 
 ## 🏗️ Architecture
 
 **Stack:**
-- **Frontend:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, shadcn/ui
-- **Backend:** NestJS 10, TypeScript, Prisma ORM
-- **Database:** PostgreSQL 15
-- **Cache/Sessions:** Redis 7
-- **Infrastructure:** Docker, Nginx, Cloudflare
+- **Frontend:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS,
+  Zustand (state), React Query (data fetching)
+- **Backend:** NestJS 10, TypeScript, Prisma 5 ORM, Passport + JWT auth
+- **Database:** PostgreSQL 15 (Supabase)
+- **Images:** Cloudinary
 
-**Architecture Style:** Three-tier monolithic with defense-in-depth security
+**Deployment (production):**
+- **Database:** Supabase (PostgreSQL, Singapore region)
+- **Backend API:** Render (web service, `backend/` root)
+- **Frontend:** Vercel (`frontend/` root)
 
-## 📋 Documentation Index
+Migrations and the bootstrap seed run automatically on backend boot
+(`backend/src/run-migrations.ts`).
 
-### Planning & Design Documents
-
-1. **[Requirements Analysis](docs/requirements/01-requirements-analysis.md)**
-   - Gap analysis and enhancements
-   - 20+ entities identified
-   - Security and compliance requirements
-
-2. **[System Architecture](docs/architecture/02-system-architecture.md)**
-   - 3-tier architecture design
-   - Component diagrams
-   - Technology decisions
-   - Scalability strategy
-
-3. **[Database Schema](docs/database/03-database-schema-design.md)**
-   - 20 normalized tables (3NF)
-   - Complete Prisma schema
-   - 50+ indexes for performance
-   - Migration strategy
-
-4. **[API Specifications](docs/api/04-api-design-specifications.md)**
-   - 80+ RESTful endpoints
-   - Request/response schemas
-   - Authentication & authorization
-   - Rate limiting & error handling
-
-5. **[Security Architecture](docs/security/05-security-architecture.md)**
-   - STRIDE threat model
-   - Authentication & authorization
-   - Security controls & testing
-   - Compliance (GDPR, age verification)
-
-6. **[Project Structure](docs/project-structure/06-project-structure.md)**
-   - Complete folder hierarchies
-   - Naming conventions
-   - Configuration files
-   - Code organization patterns
-
-7. **[Implementation Roadmap](docs/roadmap/07-implementation-roadmap.md)**
-   - 12-week development plan
-   - 6 sprint breakdown
-   - Resource allocation
-   - Success criteria
-
-## 🚀 Quick Start
+## 🚀 Local Development
 
 ### Prerequisites
-
 - Node.js 20+ LTS
-- PostgreSQL 15+
-- Redis 7+
-- Docker & Docker Compose (recommended)
-- npm or yarn
+- PostgreSQL 15+ (local or a Supabase connection string)
+- npm
 
-### Development Setup
+### Setup
 
-1. **Clone the repository:**
+1. **Clone:**
    ```bash
    git clone <repository-url>
-   cd vape-shop-system
+   cd Vp-and-Sounds-Inventory-System
    ```
 
-2. **Run setup script:**
+2. **Environment variables:**
    ```bash
-   chmod +x scripts/setup.sh
-   ./scripts/setup.sh
+   cp backend/.env.example backend/.env       # set DATABASE_URL, JWT secrets, Cloudinary (optional)
+   cp frontend/.env.example frontend/.env.local  # set NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
    ```
-
-   Or manually:
 
 3. **Install dependencies:**
    ```bash
-   # Install root dependencies
-   npm install
-
-   # Install backend dependencies
    cd backend && npm install
-
-   # Install frontend dependencies
    cd ../frontend && npm install
    ```
 
-4. **Set up environment variables:**
+4. **Database (from `backend/`):**
    ```bash
-   # Backend
-   cp backend/.env.example backend/.env
-   # Edit backend/.env with your configuration
-
-   # Frontend
-   cp frontend/.env.example frontend/.env.local
-   # Edit frontend/.env.local with your configuration
-   ```
-
-5. **Set up database:**
-   ```bash
-   cd backend
-
-   # Generate Prisma client
    npx prisma generate
-
-   # Run migrations
    npx prisma migrate dev
-
-   # Seed database
    npm run db:seed
    ```
 
-6. **Start development servers:**
+5. **Run (two terminals):**
    ```bash
-   # From root directory
-   npm run dev
-
-   # Or start individually:
-   # Backend (port 4000)
+   # backend (port 4000)
    cd backend && npm run start:dev
-
-   # Frontend (port 3000)
+   # frontend (port 3000)
    cd frontend && npm run dev
    ```
 
-7. **Access the application:**
+6. **Access:**
    - Frontend: http://localhost:3000
-   - Backend API: http://localhost:4000
-   - API Docs: http://localhost:4000/api/docs
+   - API: http://localhost:4000
+   - API docs (Swagger): http://localhost:4000/api/docs
    - Prisma Studio: `cd backend && npx prisma studio`
 
-### Using Docker
+> A `docker-compose.dev.yml` is included for spinning up a local Postgres if you
+> don't have one installed.
 
-```bash
-# Start all services
-docker-compose up -d
+## 👥 Default Accounts (seed)
 
-# View logs
-docker-compose logs -f
+The seed creates two bootstrap accounts. Create shops, staff, and more admins
+from inside the app afterwards.
 
-# Stop services
-docker-compose down
-```
+| Role  | Email                   | Password        |
+|-------|-------------------------|-----------------|
+| Owner | owner@chxinventory.com  | OwnerPass123!   |
+| Admin | admin@chxinventory.com  | ChangeMe123!    |
 
-## 👥 Default User
+The seed emails/passwords can be overridden with `SEED_ADMIN_EMAIL` /
+`SEED_ADMIN_PASSWORD`. Both accounts are flagged to force a password change on
+first login.
 
-After running the seed script, a single bootstrap account is created. Create
-shops, staff and additional admins from inside the app afterwards.
+⚠️ **Change these credentials before going live.**
 
-| Role | Email | Password | Permissions |
-|------|-------|----------|-------------|
-| Admin | admin@vapeshop.com | ChangeMe123! | Full access |
+## 👤 Roles
 
-⚠️ **IMPORTANT:** Change this password immediately in production!
+- **Owner** — full access, including confidential cost/profit data (Capital,
+  Net Profit, Margin) and user management.
+- **Admin** — manage catalog, inventory, branches, staff; approve/decline
+  sales, disposals, and expenses; cost-free Sales Summary (no profit figures).
+- **Staff** — branch-scoped POS: build and submit sales/disposals/expenses,
+  view products and their own daily report.
+- **Viewer** — read-only: view products and stock-movement history; cannot
+  change anything.
+
+## 🔐 Security
+
+- JWT authentication with refresh tokens
+- bcrypt password hashing (configurable rounds, default 12)
+- Role-based access control, enforced on the server
+- Rate limiting (`@nestjs/throttler`)
+- Security headers via Helmet
+- Server-side input validation (`class-validator`)
+- Audit logging of key actions
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
-npm test
-
-# Backend tests
 cd backend
-npm run test              # Unit tests
-npm run test:watch        # Watch mode
-npm run test:cov          # Coverage report
-npm run test:e2e          # E2E tests
-
-# Frontend tests
-cd frontend
-npm run test              # Unit tests
-npm run test:watch        # Watch mode
+npm run test       # unit tests
+npm run test:e2e   # end-to-end tests
 ```
 
-## 📦 Building for Production
+> Test coverage is currently light and is an area for future improvement.
+
+## 📦 Build
 
 ```bash
-# Build all
-npm run build
-
-# Or build individually:
-cd backend && npm run build
+cd backend && npm run build    # outputs to dist/src/main.js
 cd frontend && npm run build
 ```
 
 ## 🚢 Deployment
 
-See [Deployment Guide](docs/deployment/deployment-guide.md) for detailed instructions.
+The repo is wired for **Supabase + Render + Vercel**:
 
-### Quick Production Deployment
+1. **Supabase** — create a PostgreSQL project (Singapore region). Grab the
+   transaction pooler URL (port 6543, `?pgbouncer=true`) for `DATABASE_URL` and
+   the session pooler URL (port 5432) for `MIGRATE_DATABASE_URL`.
+2. **Render** — deploy `backend/` as a Node web service (see `render.yaml`).
+   Start command: `node dist/src/main.js`. Set `DATABASE_URL`,
+   `MIGRATE_DATABASE_URL`, `CORS_ORIGIN` (your Vercel URL), JWT secrets, and
+   optional Cloudinary vars. Migrations + seed run on boot.
+3. **Vercel** — deploy with **Root Directory = `frontend`**. Set
+   `NEXT_PUBLIC_API_URL` to `https://<your-render-app>.onrender.com/api/v1`.
 
-1. **Set up production server** (Ubuntu 22.04 LTS recommended)
-2. **Install dependencies** (Docker, Docker Compose, Nginx)
-3. **Configure environment variables**
-4. **Deploy using Docker Compose:**
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d
-   ```
-5. **Configure Nginx reverse proxy**
-6. **Set up SSL certificates** (Let's Encrypt)
-7. **Configure Cloudflare** for CDN and WAF
-8. **Set up automated backups**
+> On Render's free tier the backend sleeps after inactivity; the first request
+> after a cold start can take ~30–50s.
 
-## 🔐 Security
+## 📁 Project Structure
 
-This system implements enterprise-grade security:
-
-- ✅ JWT authentication with refresh tokens
-- ✅ bcrypt password hashing (12 rounds)
-- ✅ Role-based access control (RBAC)
-- ✅ Account lockout (5 failed attempts)
-- ✅ Rate limiting (100 req/min per IP)
-- ✅ HTTPS only (TLS 1.3)
-- ✅ Security headers (CSP, HSTS, etc.)
-- ✅ Input validation and sanitization
-- ✅ SQL injection prevention
-- ✅ XSS & CSRF protection
-- ✅ Comprehensive audit logging
-
-See [Security Architecture](docs/security/05-security-architecture.md) for details.
-
-## 📊 Features by Role
-
-### Owner
-- Full system access
-- User management
-- System settings
-- All reports and analytics
-- Audit log access
-
-### Admin
-- Product management
-- Inventory management
-- Purchase orders
-- Sales management
-- Staff performance reports
-
-### Staff
-- Point of Sale (POS)
-- Inventory receiving
-- View products and inventory
-- View own sales
-
-## 🛠️ Technology Stack
-
-### Backend
-- **Framework:** NestJS 10
-- **Language:** TypeScript 5
-- **ORM:** Prisma 5
-- **Database:** PostgreSQL 15
-- **Cache:** Redis 7
-- **Authentication:** Passport.js + JWT
-- **Validation:** class-validator
-- **Documentation:** Swagger/OpenAPI
-
-### Frontend
-- **Framework:** Next.js 14 (App Router)
-- **Language:** TypeScript 5
-- **UI Library:** React 18
-- **Styling:** Tailwind CSS 3
-- **Components:** shadcn/ui
-- **Forms:** React Hook Form + Zod
-- **State:** Zustand
-- **Data Fetching:** React Query
-- **Real-time:** Socket.io Client
-
-### DevOps
-- **Containerization:** Docker
-- **Orchestration:** Docker Compose
-- **Reverse Proxy:** Nginx
-- **CDN/WAF:** Cloudflare
-- **CI/CD:** GitHub Actions
-- **Monitoring:** Prometheus + Grafana
-
-## 📈 Performance
-
-- **API Response Time:** < 500ms (p95)
-- **Page Load Time:** < 2s
-- **Concurrent Users:** 50+
-- **Transactions/Day:** 10,000+
-- **Database Size:** Optimized for 100GB+
-
-## 🔄 Development Workflow
-
-1. **Create feature branch:** `git checkout -b feature/your-feature`
-2. **Make changes and commit:** Follow conventional commits
-3. **Run tests:** `npm test`
-4. **Run linter:** `npm run lint`
-5. **Push changes:** `git push origin feature/your-feature`
-6. **Create pull request**
-7. **Code review & approval**
-8. **Merge to develop**
-9. **Deploy to staging** (automatic)
-10. **Production deployment** (manual approval)
-
-## 📝 Code Style
-
-- **TypeScript** for type safety
-- **ESLint** for code quality
-- **Prettier** for formatting
-- **Conventional Commits** for commit messages
-- **Module-based** organization
-- **Test-driven** development encouraged
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and development process.
+```
+backend/    NestJS API (modules: auth, users, branches, brands, products,
+            sales, disposals, expenses, stats, stock-movements, activity-logs)
+frontend/   Next.js app (dashboard = Owner/Admin/Viewer, staff = POS portal)
+brand-assets/  Source brand images (logos, wallpapers)
+docs/       Design/reference docs (aspirational — not all of it is implemented)
+```
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **Documentation:** See `docs/` directory
-- **Issues:** GitHub Issues
-- **Email:** support@example.com
-
-## 🗺️ Roadmap
-
-### Phase 1: MVP (Weeks 1-6) ✅
-- Authentication & user management
-- Product & inventory management
-- Point of Sale system
-- Basic reporting
-
-### Phase 2: Advanced Features (Weeks 7-10) 🚧
-- Purchase orders
-- Customer management
-- Advanced reporting
-- Real-time updates
-
-### Phase 3: Production Ready (Weeks 11-12) ⏳
-- Security hardening
-- Performance optimization
-- Production deployment
-- Documentation
-
-### Future Enhancements
-- Multi-location support
-- Mobile app
-- Advanced analytics
-- Third-party integrations
-
-## 🙏 Acknowledgments
-
-- NestJS Team for the amazing framework
-- Vercel Team for Next.js
-- shadcn for the UI components
-- All open source contributors
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-**Project Status:** Design Complete, Ready for Implementation  
-**Version:** 1.0.0  
-**Last Updated:** June 11, 2026
-
-For detailed technical information, see the [documentation](docs/) directory.
+**App:** Vape and Sounds Inventory & Sales Management System
