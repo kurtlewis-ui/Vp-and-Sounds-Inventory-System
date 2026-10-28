@@ -222,6 +222,7 @@ export class DraftsService {
             customerName: draft.customerName ?? undefined,
             items: items.map((i) => ({
               productId: i.productId,
+              variantId: i.variantId ?? undefined,
               quantity: i.quantity,
               discount: i.discount ?? undefined,
               paymentMethod: i.paymentMethod,
@@ -246,7 +247,7 @@ export class DraftsService {
       try {
         disposals.push(
           await this.disposalsService.create(
-            { branchId: draft.branchId, productId: d.productId, quantity: d.quantity, reason: d.reason, addedAt: d.addedAt ?? undefined },
+            { branchId: draft.branchId, productId: d.productId, variantId: d.variantId ?? undefined, quantity: d.quantity, reason: d.reason, addedAt: d.addedAt ?? undefined },
             staffActor,
           ),
         );

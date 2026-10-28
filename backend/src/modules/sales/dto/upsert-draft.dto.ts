@@ -24,6 +24,17 @@ export class DraftItemDto {
   @IsUUID()
   productId: string;
 
+  @ApiProperty({ required: false, description: 'Variant (flavor/color) ID when the product has variants' })
+  @IsOptional()
+  @IsUUID()
+  variantId?: string;
+
+  @ApiProperty({ required: false, nullable: true, description: 'Variant name snapshot (display only)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  variantName?: string | null;
+
   @ApiProperty()
   @IsString()
   @MaxLength(150)
@@ -91,6 +102,17 @@ export class DraftDisposalItemDto {
   @ApiProperty()
   @IsUUID()
   productId: string;
+
+  @ApiProperty({ required: false, description: 'Variant (flavor/color) ID when the product has variants' })
+  @IsOptional()
+  @IsUUID()
+  variantId?: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  variantName?: string | null;
 
   @ApiProperty()
   @IsString()
