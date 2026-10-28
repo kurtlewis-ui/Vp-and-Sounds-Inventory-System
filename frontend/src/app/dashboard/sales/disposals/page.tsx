@@ -14,8 +14,9 @@ import { NumberStepper } from '@/components/NumberStepper';
 import { useUnsavedGuard } from '@/lib/useUnsavedGuard';
 import { useStoredBranch } from '@/lib/useStoredBranch';
 
-function peso(n: number) {
-  return `\u20B1${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function peso(n: number | null | undefined) {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  return `\u20B1${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });

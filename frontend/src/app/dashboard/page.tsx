@@ -23,8 +23,9 @@ const SalesOverviewChart = dynamic(() => import('@/components/DashboardCharts').
 const TopProductsDonut = dynamic(() => import('@/components/DashboardCharts').then((m) => m.TopProductsDonut), { ssr: false });
 const DisposedBarChart = dynamic(() => import('@/components/DashboardCharts').then((m) => m.DisposedBarChart), { ssr: false, loading: chartLoading });
 
-function peso(n: number) {
-  return `\u20B1${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+function peso(n: number | null | undefined) {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  return `\u20B1${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
 // Chart palettes — colorful in BOTH themes now (dark used to be grayscale).

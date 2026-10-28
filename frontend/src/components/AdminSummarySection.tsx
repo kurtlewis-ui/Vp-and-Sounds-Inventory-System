@@ -7,8 +7,9 @@ import { useStoredBranch } from '@/lib/useStoredBranch';
 import { Store, CalendarDays, RotateCcw } from 'lucide-react';
 import { Select } from '@/components/Select';
 
-function peso(n: number) {
-  return `\u20B1${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function peso(n: number | null | undefined) {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  return `\u20B1${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // The shop operates on a Philippine business day (UTC+8, starts 12 AM /

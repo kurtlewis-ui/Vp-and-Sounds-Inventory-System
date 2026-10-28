@@ -24,8 +24,9 @@ import {
   Cell,
 } from 'recharts';
 
-function peso(n: number) {
-  return `\u20B1${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+function peso(n: number | null | undefined) {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  return `\u20B1${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
 const tooltipStyle = (isDark: boolean, border?: string) => ({

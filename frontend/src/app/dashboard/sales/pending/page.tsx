@@ -35,8 +35,12 @@ import { useAuthStore } from '@/lib/store';
 import { EditSaleModal } from '@/components/EditSaleModal';
 import type { Sale, PaymentMethod, PaymentSplit } from '@/lib/types';
 
-function peso(n: number) {
-  return `\u20B1${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function peso(n: number | null | undefined) {
+  // Coerce missing/NaN values to 0 so a transient shape mismatch (e.g. an API
+  // response from a slightly older deploy that lacks a new field) never crashes
+  // the page with "Cannot read properties of undefined (reading 'toLocaleString')".
+  const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  return `\u20B1${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, {

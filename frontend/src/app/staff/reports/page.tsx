@@ -24,8 +24,9 @@ import { phBusinessToday } from '@/lib/business-day';
 import { filterSalesByProduct } from '@/lib/sale-search';
 import type { Sale, Disposal, Expense } from '@/lib/types';
 
-function peso(n: number) {
-  return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function peso(n: number | null | undefined) {
+  const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  return `₱${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, {

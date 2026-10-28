@@ -8,8 +8,9 @@ import { useAuthStore } from '@/lib/store';
 import { getApiErrorMessage } from '@/lib/api';
 import { GridSkeleton } from '@/components/Skeleton';
 
-function peso(n: number) {
-  return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function peso(n: number | null | undefined) {
+  const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  return `₱${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function StaffHomePage() {

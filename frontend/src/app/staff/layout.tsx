@@ -30,8 +30,9 @@ import {
   PhilippinePeso,
 } from 'lucide-react';
 
-function peso(n: number) {
-  return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function peso(n: number | null | undefined) {
+  const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  return `₱${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const navItems = [
@@ -962,8 +963,9 @@ function EditPaymentInline({
 
   const lineTotal = item.unitPrice * item.quantity - (item.discount ?? 0);
 
-  function peso(n: number) {
-    return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  function peso(n: number | null | undefined) {
+    const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+    return `₱${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   // For a Split, the entered buckets (cash/gcash/bpi/bdo) must add up EXACTLY
