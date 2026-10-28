@@ -548,19 +548,25 @@ export default function StaffDailyReportPage() {
                   <span className="flex items-center gap-2 text-xs text-text-primary">
                     {r.icon === 'cash' ? (
                       <span
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold leading-none text-white"
                         style={{ background: '#15803d' }}
                         aria-hidden="true"
                       >
                         ₱
                       </span>
                     ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`/payments/${r.icon}.png`}
-                        alt=""
-                        className="h-5 w-5 shrink-0 rounded-full object-cover"
-                      />
+                      // Uniform badge: fixed 20px circle, logo scaled to fill it
+                      // identically (the logos already carry their own colored
+                      // circular background, so object-cover crops to the same
+                      // circle edge and all three read the same size).
+                      <span className="block h-5 w-5 shrink-0 overflow-hidden rounded-full">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/payments/${r.icon}.png`}
+                          alt=""
+                          className="h-full w-full scale-110 object-cover"
+                        />
+                      </span>
                     )}
                     {r.label}
                   </span>
