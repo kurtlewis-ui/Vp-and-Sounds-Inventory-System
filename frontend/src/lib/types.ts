@@ -167,8 +167,11 @@ export interface PaymentSplit {
 export interface SaleLineItem {
   id: string;
   productId: string | null;
+  variantId?: string | null;
   name: string;
   brandName: string;
+  // Flavor/color name snapshot (null for simple products).
+  variantName?: string | null;
   quantity: number;
   unitPrice: number;
   costPrice?: number;

@@ -146,7 +146,7 @@ export default function SalesRecordsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3"><ProductThumb src={item.image} alt={item.name} /></td>
-                      <td className="px-4 py-3 text-sm text-text-primary">{item.name}</td>
+                      <td className="px-4 py-3 text-sm text-text-primary">{item.name}{item.variantName ? <span className="text-text-secondary"> · {item.variantName}</span> : null}</td>
                       <td className="px-4 py-3 text-sm text-text-primary">{item.quantity}</td>
                       <td className="px-4 py-3 text-sm text-text-secondary">{item.brandName}</td>
                       <td className="px-4 py-3 text-sm text-text-primary">{peso(item.unitPrice)}</td>
