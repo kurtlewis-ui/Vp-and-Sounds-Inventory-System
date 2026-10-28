@@ -382,7 +382,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            opacity: 0.15,
+            opacity: 0.1,
           }}
         />
       )}
