@@ -183,7 +183,7 @@ export default function BrandProductsPage() {
   );
 }
 
-type ItemPaymentMethod = 'Cash' | 'Gcash' | 'BankTransfer' | 'Split';
+type ItemPaymentMethod = 'Cash' | 'Gcash' | 'BPI' | 'BDO' | 'Split';
 
 function AddPurchaseModal({
   product,
@@ -199,8 +199,9 @@ function AddPurchaseModal({
   const [paymentMethod, setPaymentMethod] = useState<ItemPaymentMethod | ''>('');
   const [splitCash, setSplitCash] = useState('');
   const [splitGcash, setSplitGcash] = useState('');
-  const [splitBank, setSplitBank] = useState('');
-  // Bank reference/note for Bank Transfer (or a Split with a bank portion).
+  const [splitBdo, setSplitBdo] = useState('');
+  const [splitBpi, setSplitBpi] = useState('');
+  // Bank reference/note for BPI/BDO (or a Split with a bank portion).
   const [bankNote, setBankNote] = useState('');
   const [note, setNote] = useState('');
   const [disposalReason, setDisposalReason] = useState('');
@@ -229,13 +230,14 @@ function AddPurchaseModal({
   const discountTooHigh = discountNumber > lineTotal + 0.001;
   const discountedTotal = Math.max(0, lineTotal - discountNumber);
 
-  // Split allocation across the three buckets (cash/gcash/bankTransfer). They
-  // must add up EXACTLY to the line total — there is no leftover bucket. We
-  // surface the remaining amount and block saving until it's fully allocated.
+  // Split allocation across the buckets (cash/gcash/bdo/bpi). They must add up
+  // EXACTLY to the line total — there is no leftover bucket. We surface the
+  // remaining amount and block saving until it's fully allocated.
   const splitCashN = Number(splitCash) || 0;
   const splitGcashN = Number(splitGcash) || 0;
-  const splitBankN = Number(splitBank) || 0;
-  const splitAllocated = splitCashN + splitGcashN + splitBankN;
+  const splitBdoN = Number(splitBdo) || 0;
+  const splitBpiN = Number(splitBpi) || 0;
+  const splitAllocated = splitCashN + splitGcashN + splitBdoN + splitBpiN;
   const splitRemainder = discountedTotal - splitAllocated;
   // Not fully allocated when it's off by more than a cent (over OR under).
   const splitMismatch = Math.abs(splitRemainder) > 0.01;
@@ -267,10 +269,10 @@ function AddPurchaseModal({
       return;
     }
     if (paymentMethod === 'Split' && splitMismatch) {
-      setError('Split amounts must add up to the item total (Cash + Gcash + Bank Transfer).');
+      setError('Split amounts must add up to the item total (Cash + Gcash + BDO + BPI).');
       return;
     }
-    const usesBank = paymentMethod === 'BankTransfer' || paymentMethod === 'Split';
+    const usesBank = paymentMethod === 'BPI' || paymentMethod === 'BDO' || paymentMethod === 'Split';
     addItem(
       {
         productId: product.id,
@@ -286,7 +288,8 @@ function AddPurchaseModal({
             ? {
                 cash: splitCashN,
                 gcash: splitGcashN,
-                bankTransfer: splitBankN,
+                bdo: splitBdoN,
+                bpi: splitBpiN,
               }
             : null,
       },
@@ -385,14 +388,18 @@ function AddPurchaseModal({
           {/* Payment Method — Toggle Buttons */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-2">Payment Method</label>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Payment buttons. When ACTIVE each uses its brand/status color;
+                when inactive, hovering previews that color on the border:
+                Cash=green, Gcash=light blue, BDO=dark blue, BPI=dark red,
+                Split=purple. */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <button
                 type="button"
                 onClick={() => { setPaymentMethod('Cash'); setDirty(true); }}
                 className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   paymentMethod === 'Cash'
-                    ? 'bg-btn-primary text-btn-primary-text shadow-md'
-                    : 'border-2 border-input-border text-text-primary hover:border-btn-primary'
+                    ? 'bg-[#15803d] text-white shadow-md'
+                    : 'border-2 border-input-border text-text-primary hover:border-[#15803d] hover:text-[#15803d]'
                 }`}
               >
                 Cash
@@ -402,50 +409,61 @@ function AddPurchaseModal({
                 onClick={() => { setPaymentMethod('Gcash'); setDirty(true); }}
                 className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   paymentMethod === 'Gcash'
-                    ? 'bg-accent-blue text-white shadow-md'
-                    : 'border-2 border-input-border text-text-primary hover:border-accent-blue'
+                    ? 'bg-[#38bdf8] text-white shadow-md'
+                    : 'border-2 border-input-border text-text-primary hover:border-[#38bdf8] hover:text-[#38bdf8]'
                 }`}
               >
                 Gcash
               </button>
               <button
                 type="button"
-                onClick={() => { setPaymentMethod('BankTransfer'); setDirty(true); }}
+                onClick={() => { setPaymentMethod('BDO'); setDirty(true); }}
                 className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                  paymentMethod === 'BankTransfer'
-                    ? 'bg-accent-purple text-white shadow-md'
-                    : 'border-2 border-input-border text-text-primary hover:border-accent-purple'
+                  paymentMethod === 'BDO'
+                    ? 'bg-[#1e3a8a] text-white shadow-md'
+                    : 'border-2 border-input-border text-text-primary hover:border-[#1e3a8a] hover:text-[#1e3a8a]'
                 }`}
               >
-                Bank Transfer
+                BDO
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPaymentMethod('BPI'); setDirty(true); }}
+                className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                  paymentMethod === 'BPI'
+                    ? 'bg-[#7f1d1d] text-white shadow-md'
+                    : 'border-2 border-input-border text-text-primary hover:border-[#7f1d1d] hover:text-[#7f1d1d]'
+                }`}
+              >
+                BPI
               </button>
               <button
                 type="button"
                 onClick={() => { setPaymentMethod('Split'); setDirty(true); }}
                 className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   paymentMethod === 'Split'
-                    ? 'bg-btn-primary text-btn-primary-text shadow-md'
-                    : 'border-2 border-input-border text-text-primary hover:border-btn-primary'
+                    ? 'bg-[#7c3aed] text-white shadow-md'
+                    : 'border-2 border-input-border text-text-primary hover:border-[#7c3aed] hover:text-[#7c3aed]'
                 }`}
               >
                 Split
               </button>
             </div>
-            {paymentMethod === 'BankTransfer' && (
+            {(paymentMethod === 'BPI' || paymentMethod === 'BDO') && (
               <div className="mt-3">
-                <label className="block text-xs font-medium text-text-secondary mb-1">Bank / reference (optional)</label>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Reference / note (optional)</label>
                 <input
                   type="text"
                   value={bankNote}
                   onChange={(e) => { setBankNote(e.target.value); setDirty(true); }}
-                  placeholder="e.g. BPI · ref 12345"
+                  placeholder="e.g. ref 12345"
                   className="w-full rounded-lg border border-input-border bg-input-bg px-3 py-2 text-sm focus:outline-none focus:border-input-focus"
                 />
               </div>
             )}
             {paymentMethod === 'Split' && (
               <div className="mt-3 space-y-3">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div>
                     <label className="block text-xs font-medium text-text-secondary mb-1">Cash (₱)</label>
                     <input
@@ -471,26 +489,38 @@ function AddPurchaseModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Bank (₱)</label>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">BDO (₱)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      value={splitBank}
-                      onChange={(e) => { setSplitBank(e.target.value); setDirty(true); }}
+                      value={splitBdo}
+                      onChange={(e) => { setSplitBdo(e.target.value); setDirty(true); }}
+                      placeholder="0"
+                      className="w-full rounded-lg border border-input-border bg-input-bg px-3 py-2 text-sm focus:outline-none focus:border-input-focus"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">BPI (₱)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={splitBpi}
+                      onChange={(e) => { setSplitBpi(e.target.value); setDirty(true); }}
                       placeholder="0"
                       className="w-full rounded-lg border border-input-border bg-input-bg px-3 py-2 text-sm focus:outline-none focus:border-input-focus"
                     />
                   </div>
                 </div>
-                {splitBankN > 0 && (
+                {(splitBdoN > 0 || splitBpiN > 0) && (
                   <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Bank / reference (optional)</label>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Reference / note (optional)</label>
                     <input
                       type="text"
                       value={bankNote}
                       onChange={(e) => { setBankNote(e.target.value); setDirty(true); }}
-                      placeholder="e.g. BPI · ref 12345"
+                      placeholder="e.g. ref 12345"
                       className="w-full rounded-lg border border-input-border bg-input-bg px-3 py-2 text-sm focus:outline-none focus:border-input-focus"
                     />
                   </div>

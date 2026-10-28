@@ -323,7 +323,9 @@ model StockMovement {
 enum PaymentMethod {
   Cash
   Gcash
-  BankTransfer
+  // Bank payments are split into the two banks the shop accepts.
+  BPI
+  BDO
   // Item-level only: paid across more than one of the above (see
   // SaleItem.paymentSplit for the breakdown).
   Split
@@ -411,11 +413,12 @@ model SaleItem {
 
   // How this specific item was paid for.
   paymentMethod PaymentMethod @default(Cash) @map("payment_method")
-  // Which bank, when paymentMethod is BankTransfer (or included in a split).
+  // Optional bank reference/note, when paymentMethod is BPI/BDO (or a split
+  // includes a bank portion).
   bankNote      String?       @map("bank_note") @db.VarChar(100)
   // Free-text reminder/note for this item.
   note          String?       @map("note") @db.VarChar(255)
-  // { cash, gcash, bankTransfer } amounts, only when paymentMethod is Split —
+  // { cash, gcash, bpi, bdo } amounts, only when paymentMethod is Split —
   // must sum exactly to subTotal.
   paymentSplit  Json?         @map("payment_split") @db.JsonB
   // When this line was ORIGINALLY added to the staff's draft cart (they may

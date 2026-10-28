@@ -12,10 +12,10 @@ function peso(n: number) {
   return `\u20B1${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// Human-friendly label for a payment method (only 'BankTransfer' needs a space;
-// 'Split'/'Mixed' are shown as-is).
+// Human-friendly label for a payment method. All current methods (Cash, Gcash,
+// BPI, BDO, Split, Mixed) are shown as-is.
 function methodLabel(pm: PaymentMethod): string {
-  return pm === 'BankTransfer' ? 'Bank Transfer' : pm;
+  return pm;
 }
 
 // Local modal (moved here with the Edit Sale modal so both the Owner/Admin
@@ -76,7 +76,8 @@ interface EditRow {
 const EDITABLE_PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: 'Cash', label: 'Cash' },
   { value: 'Gcash', label: 'Gcash' },
-  { value: 'BankTransfer', label: 'Bank Transfer' },
+  { value: 'BDO', label: 'BDO' },
+  { value: 'BPI', label: 'BPI' },
 ];
 
 /**
@@ -172,8 +173,8 @@ export function EditSaleModal({
   };
   const removeRow = (idx: number) => { setDirty(true); setRows((rs) => rs.filter((_, i) => i !== idx)); };
   // Change a line's payment method. Switching to a simple method (Cash/Gcash/
-  // BankTransfer) drops any previous Split breakdown — the whole line total is
-  // now paid via the chosen method. (Backend recomputes the sale's rollup.)
+  // BDO/BPI) drops any previous Split breakdown — the whole line total is now
+  // paid via the chosen method. (Backend recomputes the sale's rollup.)
   const changePayment = (idx: number, paymentMethod: PaymentMethod) => {
     setDirty(true);
     setRows((rs) =>

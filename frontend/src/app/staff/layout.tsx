@@ -308,7 +308,8 @@ function toDraftSaleItemPayload(i: any) {
     out.paymentSplit = {
       cash: i.paymentSplit.cash ?? 0,
       gcash: i.paymentSplit.gcash ?? 0,
-      bankTransfer: i.paymentSplit.bankTransfer ?? 0,
+      bpi: i.paymentSplit.bpi ?? 0,
+      bdo: i.paymentSplit.bdo ?? 0,
     };
   }
   return out;
@@ -478,16 +479,18 @@ function DraftBag() {
   // item's Split-payment breakdown across its buckets. Line totals are
   // net of each item's discount.
   const paymentTotals = useMemo(() => {
-    const totals = { cash: 0, gcash: 0, bankTransfer: 0 };
+    const totals = { cash: 0, gcash: 0, bpi: 0, bdo: 0 };
     for (const item of items) {
       const lineTotal = item.unitPrice * item.quantity - (item.discount ?? 0);
       if (item.paymentMethod === 'Split' && item.paymentSplit) {
         totals.cash += item.paymentSplit.cash ?? 0;
         totals.gcash += item.paymentSplit.gcash ?? 0;
-        totals.bankTransfer += item.paymentSplit.bankTransfer ?? 0;
+        totals.bpi += item.paymentSplit.bpi ?? 0;
+        totals.bdo += item.paymentSplit.bdo ?? 0;
       } else if (item.paymentMethod === 'Cash') totals.cash += lineTotal;
       else if (item.paymentMethod === 'Gcash') totals.gcash += lineTotal;
-      else if (item.paymentMethod === 'BankTransfer') totals.bankTransfer += lineTotal;
+      else if (item.paymentMethod === 'BPI') totals.bpi += lineTotal;
+      else if (item.paymentMethod === 'BDO') totals.bdo += lineTotal;
     }
     return totals;
   }, [items]);
@@ -879,11 +882,15 @@ function DraftBag() {
                         <span className="text-text-secondary">Total Gcash</span>
                         <span className="text-text-primary">{peso(paymentTotals.gcash)}</span>
                       </div>
-                      {/* Bank Transfer always shown (Split payments already flow
-                          into these three buckets), so all methods are visible. */}
+                      {/* BDO + BPI always shown (Split payments already flow
+                          into these buckets), so all methods are visible. */}
                       <div className="flex items-center justify-between">
-                        <span className="text-text-secondary">Total Bank Transfer</span>
-                        <span className="text-text-primary">{peso(paymentTotals.bankTransfer)}</span>
+                        <span className="text-text-secondary">Total BDO</span>
+                        <span className="text-text-primary">{peso(paymentTotals.bdo)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-secondary">Total BPI</span>
+                        <span className="text-text-primary">{peso(paymentTotals.bpi)}</span>
                       </div>
                       {itemsDiscountTotal > 0 && (
                         <div className="flex items-center justify-between">
@@ -947,9 +954,10 @@ function EditPaymentInline({
   const [method, setMethod] = useState<PaymentMethod>(item.paymentMethod);
   const [splitCash, setSplitCash] = useState(String(item.paymentSplit?.cash ?? ''));
   const [splitGcash, setSplitGcash] = useState(String(item.paymentSplit?.gcash ?? ''));
-  const [splitBank, setSplitBank] = useState(String(item.paymentSplit?.bankTransfer ?? ''));
-  // Bank reference/note — used for Bank Transfer (and for a Split that includes
-  // a bank-transfer portion). Optional free text (e.g. which bank / ref no.).
+  const [splitBpi, setSplitBpi] = useState(String(item.paymentSplit?.bpi ?? ''));
+  const [splitBdo, setSplitBdo] = useState(String(item.paymentSplit?.bdo ?? ''));
+  // Bank reference/note — used for BPI/BDO (and for a Split that includes a
+  // bank portion). Optional free text (e.g. ref no.).
   const [bankNote, setBankNote] = useState(item.bankNote ?? '');
 
   const lineTotal = item.unitPrice * item.quantity - (item.discount ?? 0);
@@ -958,19 +966,19 @@ function EditPaymentInline({
     return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
-  // For a Split, the three entered buckets (cash/gcash/bankTransfer) must not
-  // must add up EXACTLY to the line total across the three buckets — there is
-  // no leftover. We surface the remaining amount and block saving until it's
-  // fully allocated (over OR under).
+  // For a Split, the entered buckets (cash/gcash/bpi/bdo) must add up EXACTLY
+  // to the line total — there is no leftover. We surface the remaining amount
+  // and block saving until it's fully allocated (over OR under).
   const splitCashN = Number(splitCash) || 0;
   const splitGcashN = Number(splitGcash) || 0;
-  const splitBankN = Number(splitBank) || 0;
-  const allocated = splitCashN + splitGcashN + splitBankN;
+  const splitBpiN = Number(splitBpi) || 0;
+  const splitBdoN = Number(splitBdo) || 0;
+  const allocated = splitCashN + splitGcashN + splitBpiN + splitBdoN;
   const remainder = lineTotal - allocated;
   const splitMismatch = Math.abs(remainder) > 0.01;
 
   function handleSave() {
-    const usesBank = method === 'BankTransfer' || method === 'Split';
+    const usesBank = method === 'BPI' || method === 'BDO' || method === 'Split';
     onSave({
       paymentMethod: method,
       bankNote: usesBank ? (bankNote.trim() || null) : null,
@@ -979,7 +987,8 @@ function EditPaymentInline({
           ? {
               cash: splitCashN,
               gcash: splitGcashN,
-              bankTransfer: splitBankN,
+              bpi: splitBpiN,
+              bdo: splitBdoN,
             }
           : null,
     });
@@ -990,18 +999,19 @@ function EditPaymentInline({
       <Select value={method} onChange={(v) => setMethod(v as PaymentMethod)} ariaLabel="Payment method" className="w-full" options={[
         { value: 'Cash', label: 'Cash' },
         { value: 'Gcash', label: 'Gcash' },
-        { value: 'BankTransfer', label: 'Bank Transfer' },
+        { value: 'BDO', label: 'BDO' },
+        { value: 'BPI', label: 'BPI' },
         { value: 'Split', label: 'Split Payment' },
       ]} />
-      {method === 'BankTransfer' && (
+      {(method === 'BPI' || method === 'BDO') && (
         <div>
-          <label className="block text-[10px] text-text-muted">Bank / reference (optional)</label>
-          <input type="text" value={bankNote} onChange={(e) => setBankNote(e.target.value)} placeholder="e.g. BPI · ref 12345" className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
+          <label className="block text-[10px] text-text-muted">Reference / note (optional)</label>
+          <input type="text" value={bankNote} onChange={(e) => setBankNote(e.target.value)} placeholder="e.g. ref 12345" className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
         </div>
       )}
       {method === 'Split' && (
         <div className="space-y-1">
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-4 gap-1">
             <div>
               <label className="block text-[10px] text-text-muted">Cash</label>
               <input type="number" min="0" step="0.01" value={splitCash} onChange={(e) => setSplitCash(e.target.value)} className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
@@ -1011,14 +1021,18 @@ function EditPaymentInline({
               <input type="number" min="0" step="0.01" value={splitGcash} onChange={(e) => setSplitGcash(e.target.value)} className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
             </div>
             <div>
-              <label className="block text-[10px] text-text-muted">Bank</label>
-              <input type="number" min="0" step="0.01" value={splitBank} onChange={(e) => setSplitBank(e.target.value)} className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
+              <label className="block text-[10px] text-text-muted">BDO</label>
+              <input type="number" min="0" step="0.01" value={splitBdo} onChange={(e) => setSplitBdo(e.target.value)} className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
+            </div>
+            <div>
+              <label className="block text-[10px] text-text-muted">BPI</label>
+              <input type="number" min="0" step="0.01" value={splitBpi} onChange={(e) => setSplitBpi(e.target.value)} className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
             </div>
           </div>
-          {splitBankN > 0 && (
+          {(splitBpiN > 0 || splitBdoN > 0) && (
             <div>
-              <label className="block text-[10px] text-text-muted">Bank / reference (optional)</label>
-              <input type="text" value={bankNote} onChange={(e) => setBankNote(e.target.value)} placeholder="e.g. BPI · ref 12345" className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
+              <label className="block text-[10px] text-text-muted">Reference / note (optional)</label>
+              <input type="text" value={bankNote} onChange={(e) => setBankNote(e.target.value)} placeholder="e.g. ref 12345" className="w-full rounded border border-input-border bg-input-bg px-1.5 py-0.5 text-xs" />
             </div>
           )}
           <p className={`text-[10px] ${splitMismatch ? 'text-accent-red' : 'text-accent-green'}`}>
