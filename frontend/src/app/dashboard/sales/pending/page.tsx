@@ -601,22 +601,34 @@ export default function SalesPendingPage() {
               <span className="font-bold text-text-primary tabular-nums">{peso(summary.total)}</span>
             </div>
             <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between gap-4 pl-3 text-sm">
-                <span className="text-text-muted">Cash</span>
-                <span className="text-text-secondary tabular-nums">{peso(summary.cash)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 pl-3 text-sm">
-                <span className="text-text-muted">Gcash</span>
-                <span className="text-text-secondary tabular-nums">{peso(summary.gcash)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 pl-3 text-sm">
-                <span className="text-text-muted">BDO</span>
-                <span className="text-text-secondary tabular-nums">{peso(summary.bdo)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 pl-3 text-sm">
-                <span className="text-text-muted">BPI</span>
-                <span className="text-text-secondary tabular-nums">{peso(summary.bpi)}</span>
-              </div>
+              {[
+                { label: 'Cash', value: summary.cash, icon: 'cash' as const },
+                { label: 'Gcash', value: summary.gcash, icon: 'gcash' as const },
+                { label: 'BDO', value: summary.bdo, icon: 'bdo' as const },
+                { label: 'BPI', value: summary.bpi, icon: 'bpi' as const },
+              ].map((r) => (
+                <div key={r.label} className="flex items-center justify-between gap-4 pl-3 text-sm">
+                  <span className="flex items-center gap-2 text-text-muted">
+                    {r.icon === 'cash' ? (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center" aria-hidden="true">
+                        <span
+                          className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[10px] font-bold leading-none text-white"
+                          style={{ background: '#15803d' }}
+                        >
+                          ₱
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/payments/${r.icon}.png`} alt="" className="h-full w-full object-contain" />
+                      </span>
+                    )}
+                    {r.label}
+                  </span>
+                  <span className="text-text-secondary tabular-nums">{peso(r.value)}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
