@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Archive, X, Loader2, Upload, Download, RefreshCw, FileDown, ClipboardList, Trash2, GripVertical, ArrowUpDown, Check, AlertTriangle, ImagePlus, Store } from 'lucide-react';
+import { Plus, Pencil, Archive, X, Loader2, Upload, Download, RefreshCw, FileDown, ClipboardList, Trash2, GripVertical, ArrowUpDown, Check, AlertTriangle, ImagePlus, Store, Layers } from 'lucide-react';
 import {
   useProducts,
   useBrands,
@@ -32,6 +32,7 @@ import { useAuthStore } from '@/lib/store';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import type { Product, ImportResult, RestockResult } from '@/lib/types';
 import { StockHistoryModal } from '@/components/StockHistoryModal';
+import { FlavorManager } from '@/components/FlavorManager';
 import { Select } from '@/components/Select';
 import { NumberStepper } from '@/components/NumberStepper';
 import { useUnsavedGuard, withScrollPreserved } from '@/lib/useUnsavedGuard';
@@ -182,6 +183,8 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [archivingProduct, setArchivingProduct] = useState<Product | null>(null);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+  // Product whose flavors/colors are being managed (FlavorManager modal).
+  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
 
   const [formName, setFormName] = useState('');
   const [formBrand, setFormBrand] = useState('');
@@ -550,6 +553,7 @@ export default function ProductsPage() {
                     <div className="flex items-center justify-end gap-2">
                       {shopFilter && <button onClick={() => setHistoryProduct(product)} className="icon-btn text-text-secondary hover:bg-white/10" title="Stock History"><ClipboardList size={16} /></button>}
                       {canManage && <button onClick={() => openEditModal(product)} className="icon-btn text-accent-blue hover:bg-accent-blue/10" title="Edit"><Pencil size={16} /></button>}
+                      {canArchive && <button onClick={() => setVariantProduct(product)} className={`icon-btn hover:bg-accent-purple/10 ${product.variantType !== 'none' ? 'text-accent-purple' : 'text-text-secondary'}`} title={product.variantType === 'color' ? 'Manage colors' : product.variantType === 'flavor' ? 'Manage flavors' : 'Add flavors/colors'}><Layers size={16} /></button>}
                       {isRealAdmin && <button onClick={() => openPhotoModal(product)} className="icon-btn text-accent-blue hover:bg-accent-blue/10" title="Change photo"><ImagePlus size={16} /></button>}
                       {canRemoveFromBranch && shopFilter && <button onClick={() => { setRemoveBranchProduct(product); setFormError(null); }} className="icon-btn text-accent-orange hover:bg-accent-orange/10" title={`Remove from ${selectedBranchName}`}><Store size={16} /></button>}
                       {canArchive && <button onClick={() => { setArchivingProduct(product); setFormError(null); setShowArchiveModal(true); }} className="icon-btn text-accent-archive hover:bg-accent-archive/10" title="Archive"><Archive size={16} /></button>}
@@ -735,6 +739,8 @@ export default function ProductsPage() {
       {showImportModal && <ImportModal branches={branches} onClose={() => setShowImportModal(false)} />}
       {showRestockModal && <RestockModal products={products} branches={branches} isOwner={isOwner} onClose={() => setShowRestockModal(false)} />}
       {historyProduct && shopFilter && <StockHistoryModal productId={historyProduct.id} productName={historyProduct.name} branchId={shopFilter} branchName={branches.find((b) => b.id === shopFilter)?.name ?? ''} isOwner={isOwner} onClose={() => setHistoryProduct(null)} />}
+
+      {variantProduct && <FlavorManager product={variantProduct} onClose={() => setVariantProduct(null)} />}
       {showResetModal && isOwner && (
         <Modal title="Reset all stock to 0?" onClose={() => { if (!resetAllStock.isPending) { setShowResetModal(false); setResetConfirmText(''); } }}>
           <div className="space-y-4">

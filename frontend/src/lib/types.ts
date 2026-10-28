@@ -110,6 +110,24 @@ export interface ProductBranchQuantity {
   archivedAt?: string | null;
 }
 
+// A product's variant kind. 'none' = simple product; 'flavor' / 'color' = has
+// variants (per-variant per-branch stock; prices stay product-level).
+export type VariantType = 'none' | 'flavor' | 'color';
+
+export interface VariantBranchQuantity {
+  branchId: string;
+  branchName: string | null;
+  quantity: number;
+}
+
+export interface ProductVariant {
+  id: string;
+  name: string;
+  isActive: boolean;
+  quantities: VariantBranchQuantity[];
+  totalQuantity: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -118,6 +136,8 @@ export interface Product {
   brand: { id: string; name: string; slug: string } | null;
   sellingPrice: number;
   costPrice?: number; // Owner-only, confidential
+  variantType: VariantType;
+  variants: ProductVariant[];
   quantityAlert: number;
   sortOrder: number; // manual display order (lower = higher up)
   isActive: boolean;
