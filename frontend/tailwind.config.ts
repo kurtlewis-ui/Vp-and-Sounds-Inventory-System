@@ -13,16 +13,9 @@ const config: Config = {
         'table-header': 'var(--content-table-header, #1e1e1e)',
         'table-header-text': 'var(--content-table-header-text, #c0c0c0)',
         // Nav — dark charcoal sidebar (never changes)
-        // Side navigation — dark near-black surface, a touch off the page bg.
-        // Side navigation — deep NAVY BLUE in BOTH light and dark themes (the
-        // sidebar is the one surface that's always navy; the rest of the app
-        // stays black in dark mode / light in light mode). Inactive nav items
-        // use nav-text — lifted to a clearer blue-tinted gray so labels pop and
-        // are easy to read on navy; the active item is white with an accent
-        // left-border.
-        'nav-bg': '#0f1b34',
-        'nav-border': 'rgba(150, 175, 230, 0.16)',
-        'nav-text': '#b8c4de',
+        'nav-bg': '#141414',
+        'nav-border': '#2a2a2a',
+        'nav-text': '#999999',
         'nav-active': '#ffffff',
         // Text colors — adapt to content theme
         'text-primary': 'var(--content-text-primary, #f0f0f0)',
