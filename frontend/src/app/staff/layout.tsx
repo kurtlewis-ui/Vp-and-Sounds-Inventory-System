@@ -300,6 +300,8 @@ function toDraftSaleItemPayload(i: any) {
     quantity: i.quantity,
     paymentMethod: i.paymentMethod,
   };
+  if (i.variantId != null) out.variantId = i.variantId;
+  if (i.variantName != null) out.variantName = i.variantName;
   if (i.image != null) out.image = i.image;
   if (i.discount != null) out.discount = i.discount;
   if (i.bankNote != null) out.bankNote = i.bankNote;
@@ -323,6 +325,8 @@ function toDraftDisposalItemPayload(d: any) {
     brandName: d.brandName,
     quantity: d.quantity,
   };
+  if (d.variantId != null) out.variantId = d.variantId;
+  if (d.variantName != null) out.variantName = d.variantName;
   if (d.image != null) out.image = d.image;
   if (d.reason != null) out.reason = d.reason;
   if (d.addedAt != null) out.addedAt = d.addedAt;
@@ -662,7 +666,10 @@ function DraftBag() {
                       <div key={`${item.productId}-${idx}`} className="rounded-lg border border-card-border p-4 space-y-2">
                         <div className="flex items-start justify-between">
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-text-primary">{item.name}</p>
+                            <p className="truncate text-sm font-semibold text-text-primary">
+                              {item.name}
+                              {item.variantName ? <span className="ml-1 font-normal text-text-secondary">· {item.variantName}</span> : null}
+                            </p>
                             <p className="text-xs text-text-muted">{item.brandName}</p>
                           </div>
                           <span className="text-[10px] text-text-muted whitespace-nowrap ml-2">{formatAddedTime(item.addedAt)}</span>
@@ -721,10 +728,13 @@ function DraftBag() {
                 ) : (
                   <div className="space-y-3">
                     {disposalItems.map((item) => (
-                      <div key={item.productId} className="rounded-lg border border-card-border p-4 space-y-2">
+                      <div key={item.id ?? `${item.productId}-${item.variantId ?? ''}`} className="rounded-lg border border-card-border p-4 space-y-2">
                         <div className="flex items-start justify-between">
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-text-primary">{item.name}</p>
+                            <p className="truncate text-sm font-semibold text-text-primary">
+                              {item.name}
+                              {item.variantName ? <span className="ml-1 font-normal text-text-secondary">· {item.variantName}</span> : null}
+                            </p>
                             <p className="text-xs text-text-muted">{item.brandName}</p>
                           </div>
                           {item.addedAt && (

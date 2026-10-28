@@ -12,6 +12,9 @@ function generateId(): string {
 export interface DraftItem {
   id: string;
   productId: string;
+  // Variant (flavor/color) selected for this line, if the product has variants.
+  variantId?: string | null;
+  variantName?: string | null;
   name: string;
   brandName: string;
   unitPrice: number;
@@ -27,6 +30,8 @@ export interface DraftItem {
 export interface DraftDisposalItem {
   id: string;
   productId: string;
+  variantId?: string | null;
+  variantName?: string | null;
   name: string;
   brandName: string;
   quantity: number;
@@ -129,14 +134,16 @@ export const useDraftStore = create<DraftState>()(
         set((state) => {
           // Re-adding a product cancels any prior tombstone for it.
           const removedProductIds = state.removedProductIds.filter((pid) => pid !== item.productId);
-          const existing = state.disposalItems.find((i) => i.productId === item.productId);
+          // A line is the same only if BOTH product and variant match, so two
+          // flavors of the same product are tracked as separate disposal lines.
+          const sameLine = (i: DraftDisposalItem) =>
+            i.productId === item.productId && (i.variantId ?? null) === (item.variantId ?? null);
+          const existing = state.disposalItems.find(sameLine);
           if (existing) {
             return {
               removedProductIds,
               disposalItems: state.disposalItems.map((i) =>
-                i.productId === item.productId
-                  ? { ...i, quantity: i.quantity + quantity }
-                  : i,
+                sameLine(i) ? { ...i, quantity: i.quantity + quantity } : i,
               ),
             };
           }
