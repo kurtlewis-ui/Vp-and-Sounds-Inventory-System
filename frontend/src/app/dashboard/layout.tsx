@@ -380,7 +380,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <img
             src="/logo.png"
             alt=""
-            className={`w-[min(70vw,620px)] max-w-none object-contain select-none ${
+            className={`object-contain select-none h-auto w-[min(92vw,92vh,1100px)] max-w-none ${
               contentTheme === 'light'
                 ? 'opacity-[0.04] [filter:grayscale(1)_brightness(1.9)]'
                 : 'opacity-[0.05]'
