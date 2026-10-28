@@ -136,7 +136,7 @@ describe('SalesService', () => {
                 productId: 'prod-1',
                 quantity: 1,
                 paymentMethod: PaymentMethod.Split,
-                paymentSplit: { cash: 50, gcash: 50, bankTransfer: 0 },
+                paymentSplit: { cash: 50, gcash: 50, bpi: 0, bdo: 0 },
               },
             ],
           },

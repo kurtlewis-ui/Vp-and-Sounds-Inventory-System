@@ -128,19 +128,20 @@ export interface Product {
   deletedAt: string | null;
 }
 
-// Cash / Gcash / Bank Transfer are the concrete payment methods. Split means
-// the item's cost was divided across those three buckets. Mixed is a
-// Sale-level-only rollup shown when its items don't all agree.
+// Cash / Gcash / BPI / BDO are the concrete payment methods. Split means the
+// item's cost was divided across those buckets. Mixed is a Sale-level-only
+// rollup shown when its items don't all agree.
 // NOTE: these mirror the backend PaymentMethod enum exactly.
-export type PaymentMethod = 'Cash' | 'Gcash' | 'BankTransfer' | 'Split' | 'Mixed';
+export type PaymentMethod = 'Cash' | 'Gcash' | 'BPI' | 'BDO' | 'Split' | 'Mixed';
 export type SaleStatus = 'PENDING' | 'APPROVED' | 'DECLINED';
 
-// The per-bucket breakdown of a Split payment. The three buckets must sum
-// exactly to the line's subtotal (enforced on both client and server).
+// The per-bucket breakdown of a Split payment. The buckets must sum exactly to
+// the line's subtotal (enforced on both client and server).
 export interface PaymentSplit {
   cash: number;
   gcash: number;
-  bankTransfer: number;
+  bpi: number;
+  bdo: number;
 }
 
 export interface SaleLineItem {
@@ -184,7 +185,8 @@ export interface SalesSummary {
   grossSales: number; // Σ(unitPrice × qty) BEFORE discount; total = grossSales − discount
   cash: number;
   gcash: number;
-  bankTransfer: number; // Bank Transfer bucket (matches backend summary)
+  bpi: number; // BPI bucket (matches backend summary)
+  bdo: number; // BDO bucket (matches backend summary)
   discount: number; // total per-item discount (Gross − Discount = Net; subtracted once)
   total: number; // NET total (after discount)
   count: number;
@@ -265,7 +267,8 @@ export interface BranchSummary {
   // apportioned across buckets). Used by the Pending "Today (Approved)" strip.
   cash: number;
   gcash: number;
-  bankTransfer: number;
+  bpi: number;
+  bdo: number;
   net: number;
 }
 

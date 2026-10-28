@@ -50,15 +50,16 @@ function DateTimeStack({ iso, className = '' }: { iso: string; className?: strin
     </span>
   );
 }
-function itemPaymentLabel(item: { paymentMethod: string; bankNote?: string | null; paymentSplit?: { cash: number; gcash: number; bankTransfer?: number } | null }) {
+function itemPaymentLabel(item: { paymentMethod: string; bankNote?: string | null; paymentSplit?: { cash: number; gcash: number; bpi?: number; bdo?: number } | null }) {
   if (item.paymentMethod === 'Split' && item.paymentSplit) {
     const parts: string[] = [];
     if (item.paymentSplit.cash > 0) parts.push(`₱${item.paymentSplit.cash.toLocaleString(undefined, { minimumFractionDigits: 2 })} Cash`);
     if (item.paymentSplit.gcash > 0) parts.push(`₱${item.paymentSplit.gcash.toLocaleString(undefined, { minimumFractionDigits: 2 })} Gcash`);
-    if ((item.paymentSplit.bankTransfer ?? 0) > 0) parts.push(`₱${item.paymentSplit.bankTransfer!.toLocaleString(undefined, { minimumFractionDigits: 2 })} Bank`);
+    if ((item.paymentSplit.bdo ?? 0) > 0) parts.push(`₱${item.paymentSplit.bdo!.toLocaleString(undefined, { minimumFractionDigits: 2 })} BDO`);
+    if ((item.paymentSplit.bpi ?? 0) > 0) parts.push(`₱${item.paymentSplit.bpi!.toLocaleString(undefined, { minimumFractionDigits: 2 })} BPI`);
     return parts.join(' · ') || 'Split';
   }
-  return item.paymentMethod === 'BankTransfer' ? 'Bank Transfer' : item.paymentMethod;
+  return item.paymentMethod;
 }
 // A submitted item is visible on the report the instant it's saved.
 // Declined items are excluded since they are permanently removed.
@@ -503,7 +504,7 @@ export default function StaffDailyReportPage() {
         // Per-method totals. A Split item contributes each of its split
         // buckets; a non-split item contributes its whole subTotal to its own
         // method. Computed once here for clarity (was inline reducers).
-        const methodTotal = (method: 'Cash' | 'Gcash' | 'BankTransfer') =>
+        const methodTotal = (method: 'Cash' | 'Gcash' | 'BPI' | 'BDO') =>
           sales.reduce(
             (sum, s) =>
               sum +
@@ -513,11 +514,7 @@ export default function StaffDailyReportPage() {
                   (i.paymentMethod === method
                     ? i.subTotal
                     : i.paymentMethod === 'Split' && i.paymentSplit
-                      ? Number(
-                          (i.paymentSplit as any)?.[
-                            method === 'BankTransfer' ? 'bankTransfer' : method.toLowerCase()
-                          ] ?? 0,
-                        )
+                      ? Number((i.paymentSplit as any)?.[method.toLowerCase()] ?? 0)
                       : 0),
                 0,
               ),
@@ -525,10 +522,14 @@ export default function StaffDailyReportPage() {
           );
         const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
         const totalDiscount = sales.reduce((sum, s) => sum + s.items.reduce((a, i) => a + (i.discount ?? 0), 0), 0);
-        const rows: { label: string; value: number; dot: string }[] = [
-          { label: 'Cash', value: methodTotal('Cash'), dot: '#10b981' },
-          { label: 'Gcash', value: methodTotal('Gcash'), dot: '#3b82f6' },
-          { label: 'Bank Transfer', value: methodTotal('BankTransfer'), dot: '#a855f7' },
+        // Each row gets a small ICON instead of a plain color dot: Cash is a
+        // green circle with a ₱ sign (CSS-made); Gcash/BDO/BPI use their brand
+        // logo images for fast recognition in the summary.
+        const rows: { label: string; value: number; icon: 'cash' | 'gcash' | 'bdo' | 'bpi' }[] = [
+          { label: 'Cash', value: methodTotal('Cash'), icon: 'cash' },
+          { label: 'Gcash', value: methodTotal('Gcash'), icon: 'gcash' },
+          { label: 'BDO', value: methodTotal('BDO'), icon: 'bdo' },
+          { label: 'BPI', value: methodTotal('BPI'), icon: 'bpi' },
         ];
         return (
           <div className="mt-4 rounded-xl border border-card-border bg-card-bg p-4 shadow-sm">
@@ -544,7 +545,22 @@ export default function StaffDailyReportPage() {
               {rows.map((r) => (
                 <div key={r.label} className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-xs text-text-primary">
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.dot }} />
+                    {r.icon === 'cash' ? (
+                      <span
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                        style={{ background: '#15803d' }}
+                        aria-hidden="true"
+                      >
+                        ₱
+                      </span>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/payments/${r.icon}.png`}
+                        alt=""
+                        className="h-5 w-5 shrink-0 rounded-full object-cover"
+                      />
+                    )}
                     {r.label}
                   </span>
                   <span className="text-xs font-semibold tabular-nums text-text-primary">{peso(r.value)}</span>

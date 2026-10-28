@@ -345,24 +345,27 @@ export class StatsService {
     // Derived (no extra query) so Gross − Discount = Net reconciles exactly.
     const totalGrossSales = totalSales + totalDiscount;
 
-    // Payment-method buckets (Cash / Gcash / Bank Transfer). Split items are
-    // apportioned across their three buckets.
+    // Payment-method buckets (Cash / Gcash / BPI / BDO). Split items are
+    // apportioned across their buckets.
     let cash = 0;
     let gcash = 0;
-    let bankTransfer = 0;
+    let bpi = 0;
+    let bdo = 0;
     for (const item of paymentItems) {
       if (item.paymentMethod === 'Split' && item.paymentSplit) {
         const split = item.paymentSplit as unknown as {
-          cash: number; gcash: number; bankTransfer: number;
+          cash: number; gcash: number; bpi: number; bdo: number;
         };
         cash += Number(split.cash || 0);
         gcash += Number(split.gcash || 0);
-        bankTransfer += Number(split.bankTransfer || 0);
+        bpi += Number(split.bpi || 0);
+        bdo += Number(split.bdo || 0);
       } else {
         const amount = Number(item.subTotal);
         if (item.paymentMethod === 'Cash') cash += amount;
         else if (item.paymentMethod === 'Gcash') gcash += amount;
-        else if (item.paymentMethod === 'BankTransfer') bankTransfer += amount;
+        else if (item.paymentMethod === 'BPI') bpi += amount;
+        else if (item.paymentMethod === 'BDO') bdo += amount;
       }
     }
 
@@ -378,7 +381,8 @@ export class StatsService {
       totalDiscount,
       cash,
       gcash,
-      bankTransfer,
+      bpi,
+      bdo,
       net: totalSales - totalExpenses - totalDisposals,
     };
   }

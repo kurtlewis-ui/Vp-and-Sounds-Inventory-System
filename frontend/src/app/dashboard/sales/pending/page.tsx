@@ -47,19 +47,21 @@ function paymentDotColor(pm: PaymentMethod) {
   switch (pm) {
     case 'Cash': return 'bg-accent-green';
     case 'Gcash': return 'bg-accent-blue';
-    case 'BankTransfer': return 'bg-accent-purple';
+    case 'BDO': return 'bg-accent-blue';
+    case 'BPI': return 'bg-accent-red';
     default: return 'bg-text-muted';
   }
 }
 function methodLabel(pm: PaymentMethod): string {
-  return pm === 'BankTransfer' ? 'Bank Transfer' : pm;
+  return pm;
 }
 function itemPaymentLabel(item: { paymentMethod: PaymentMethod; bankNote?: string | null; paymentSplit?: PaymentSplit | null }) {
   if (item.paymentMethod === 'Split' && item.paymentSplit) {
     const parts: string[] = [];
     if (item.paymentSplit.cash > 0) parts.push(`₱${item.paymentSplit.cash.toLocaleString(undefined, { minimumFractionDigits: 2 })} Cash`);
     if (item.paymentSplit.gcash > 0) parts.push(`₱${item.paymentSplit.gcash.toLocaleString(undefined, { minimumFractionDigits: 2 })} Gcash`);
-    if ((item.paymentSplit.bankTransfer ?? 0) > 0) parts.push(`₱${item.paymentSplit.bankTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })} Bank`);
+    if ((item.paymentSplit.bdo ?? 0) > 0) parts.push(`₱${item.paymentSplit.bdo.toLocaleString(undefined, { minimumFractionDigits: 2 })} BDO`);
+    if ((item.paymentSplit.bpi ?? 0) > 0) parts.push(`₱${item.paymentSplit.bpi.toLocaleString(undefined, { minimumFractionDigits: 2 })} BPI`);
     return parts.join(' · ') || 'Split';
   }
   return methodLabel(item.paymentMethod);
@@ -192,7 +194,7 @@ export default function SalesPendingPage() {
     branchId: selectedShop || undefined,
   });
   const sales = useMemo(() => filterSalesByProduct(data?.data ?? [], search), [data?.data, search]);
-  const summary = data?.summary ?? { grossSales: 0, cash: 0, gcash: 0, bankTransfer: 0, discount: 0, total: 0, count: 0 };
+  const summary = data?.summary ?? { grossSales: 0, cash: 0, gcash: 0, bpi: 0, bdo: 0, discount: 0, total: 0, count: 0 };
 
   // Admin may approve/decline pending sales but must NOT edit them (the backend
   // rejects Admin edits too). Only the Owner sees the Edit control here.
@@ -604,8 +606,12 @@ export default function SalesPendingPage() {
                 <span className="text-text-secondary tabular-nums">{peso(summary.gcash)}</span>
               </div>
               <div className="flex items-center justify-between gap-4 pl-3 text-sm">
-                <span className="text-text-muted">Bank Transfer</span>
-                <span className="text-text-secondary tabular-nums">{peso(summary.bankTransfer)}</span>
+                <span className="text-text-muted">BDO</span>
+                <span className="text-text-secondary tabular-nums">{peso(summary.bdo)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4 pl-3 text-sm">
+                <span className="text-text-muted">BPI</span>
+                <span className="text-text-secondary tabular-nums">{peso(summary.bpi)}</span>
               </div>
             </div>
           </div>

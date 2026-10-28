@@ -32,7 +32,13 @@ export class PaymentSplitDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  bankTransfer: number;
+  bpi: number;
+
+  @ApiProperty({ example: 0 })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  bdo: number;
 }
 
 export class SaleItemInputDto {
@@ -63,8 +69,8 @@ export class SaleItemInputDto {
 
   @ApiProperty({
     required: false,
-    example: 'BDO',
-    description: 'Which bank, when paymentMethod is BankTransfer (or included in a split)',
+    example: 'Ref #12345',
+    description: 'Optional bank reference/note, when paymentMethod is BPI/BDO (or a split includes a bank)',
   })
   @IsOptional()
   @IsString()
