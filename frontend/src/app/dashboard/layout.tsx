@@ -240,7 +240,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       >
         {/* Logo */}
         <div className="flex items-center gap-4 px-5 py-5 border-b border-nav-border">
-          <img src="/logo.png" alt="Vape and Sounds" className="h-9 w-9 object-contain rounded" />
+          <span className="logo-shimmer rounded-full ring-2 ring-white/80 shrink-0">
+            <img src="/logo.png" alt="Vape and Sounds" className="h-9 w-9 object-cover rounded-full" />
+          </span>
           <div className="leading-tight">
             <p className="text-base font-bold text-white">Vape and Sounds</p>
             <p className="text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</p>
@@ -375,7 +377,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="Vape and Sounds" className="h-9 w-9 object-contain rounded" />
+            <span className="logo-shimmer rounded-full ring-2 ring-white/80 shrink-0">
+              <img src="/logo.png" alt="Vape and Sounds" className="h-9 w-9 object-cover rounded-full" />
+            </span>
             <div className="leading-tight text-left">
               <span className="block text-base font-bold text-white">Vape and Sounds</span>
               <span className="block text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</span>
