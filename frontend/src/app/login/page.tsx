@@ -179,7 +179,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="mt-6 text-[11px] text-[#666666] tracking-wider uppercase">
-          Inventory System
+          EST. 2021
         </p>
       </div>
     </main>

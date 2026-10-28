@@ -241,7 +241,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Logo */}
         <div className="flex items-center gap-4 px-5 py-5 border-b border-nav-border">
           <img src="/logo.png" alt="Vape and Sounds" className="h-9 w-9 object-contain rounded" />
-          <p className="text-base font-bold text-white">Vape and Sounds</p>
+          <div className="leading-tight">
+            <p className="text-base font-bold text-white">Vape and Sounds</p>
+            <p className="text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</p>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -373,7 +376,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </button>
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="Vape and Sounds" className="h-9 w-9 object-contain rounded" />
-            <span className="text-base font-bold text-white">Vape and Sounds</span>
+            <div className="leading-tight text-left">
+              <span className="block text-base font-bold text-white">Vape and Sounds</span>
+              <span className="block text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</span>
+            </div>
           </div>
           <div className="w-9" />
         </header>
