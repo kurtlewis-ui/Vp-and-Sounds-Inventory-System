@@ -20,6 +20,7 @@ import { RestockDto } from './dto/restock.dto';
 import { ReorderProductsDto } from './dto/reorder-products.dto';
 import { UndoStockDto } from './dto/undo-stock.dto';
 import { ResetStockDto } from './dto/reset-stock.dto';
+import { CreateVariantDto, UpdateVariantDto } from './dto/variant.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -165,6 +166,56 @@ export class ProductsController {
     @CurrentUser() user: RequestUser,
   ) {
     const data = await this.productsService.restoreToBranch(id, branchId, user.userId);
+    return { success: true, data };
+  }
+
+  // ===========================================================================
+  // VARIANTS (flavors / colors) — Owner + Admin
+  // ===========================================================================
+
+  @Get(':id/variants')
+  @ApiOperation({ summary: 'List a product\'s flavors/colors with per-branch stock' })
+  async findVariants(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    const data = await this.productsService.findVariants(id, branchId || undefined);
+    return { success: true, data };
+  }
+
+  @Post(':id/variants')
+  @Roles('Owner', 'Admin')
+  @ApiOperation({ summary: 'Add a flavor/color to a product' })
+  async createVariant(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateVariantDto,
+    @Query('variantType') variantType: string | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const data = await this.productsService.createVariant(id, dto, user.userId, variantType);
+    return { success: true, data };
+  }
+
+  @Patch('variants/:variantId')
+  @Roles('Owner', 'Admin')
+  @ApiOperation({ summary: 'Rename a flavor/color' })
+  async updateVariant(
+    @Param('variantId', ParseUUIDPipe) variantId: string,
+    @Body() dto: UpdateVariantDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const data = await this.productsService.updateVariant(variantId, dto, user.userId);
+    return { success: true, data };
+  }
+
+  @Delete('variants/:variantId')
+  @Roles('Owner', 'Admin')
+  @ApiOperation({ summary: 'Archive (soft-delete) a flavor/color' })
+  async removeVariant(
+    @Param('variantId', ParseUUIDPipe) variantId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const data = await this.productsService.removeVariant(variantId, user.userId);
     return { success: true, data };
   }
 }

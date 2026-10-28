@@ -10,6 +10,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
 import { ImportProductRowDto } from './dto/import-products.dto';
 import { RestockItemDto } from './dto/restock.dto';
+import { CreateVariantDto, UpdateVariantDto } from './dto/variant.dto';
 import { slugify } from '../../common/utils/string.util';
 // (UndoStockDto is validated at the controller; the service takes the id list.)
 import { UploadService } from '../../common/upload/upload.service';
@@ -953,6 +954,153 @@ export class ProductsService {
     return { undone: undone.length, skipped };
   }
 
+  // ===========================================================================
+  // VARIANTS (flavors / colors)
+  // ===========================================================================
+
+  /** List a product's active variants with per-branch stock. */
+  async findVariants(productId: string, branchId?: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+
+    const variants = await this.prisma.productVariant.findMany({
+      where: { productId, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
+        variantInventory: {
+          where: branchId ? { branchId } : undefined,
+          select: { branchId: true, quantity: true, branch: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    return variants.map((v) => this.serializeVariant(v));
+  }
+
+  /**
+   * Add a flavor/color to a product. Also flips the product to the given
+   * variant type if it was still "none" (default to "flavor" if unspecified),
+   * and seeds optional per-branch starting stock.
+   */
+  async createVariant(productId: string, dto: CreateVariantDto, userId: string, variantType?: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, deletedAt: null },
+      select: { id: true, variantType: true },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+
+    await this.assertBranchesExist(dto.quantities);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Promote the product to a variant type if it's still "none".
+      const targetType =
+        variantType && ['flavor', 'color'].includes(variantType)
+          ? variantType
+          : product.variantType !== 'none'
+            ? product.variantType
+            : 'flavor';
+      if (product.variantType !== targetType) {
+        await tx.product.update({ where: { id: productId }, data: { variantType: targetType } });
+      }
+
+      const variant = await tx.productVariant.create({
+        data: { productId, name: dto.name.trim() },
+      });
+
+      // Seed per-branch starting stock (+ a RESTOCK movement for history).
+      for (const q of dto.quantities ?? []) {
+        if (q.quantity <= 0) continue;
+        await tx.variantInventory.create({
+          data: { productId, variantId: variant.id, branchId: q.branchId, quantity: q.quantity },
+        });
+        await tx.stockMovement.create({
+          data: {
+            productId,
+            variantId: variant.id,
+            branchId: q.branchId,
+            userId,
+            type: 'RESTOCK',
+            quantityChange: q.quantity,
+            quantityAfter: q.quantity,
+            description: `Added flavor/variant "${dto.name.trim()}"`,
+          },
+        });
+      }
+
+      return variant;
+    });
+
+    await this.audit(userId, 'PRODUCT_VARIANT_CREATED', productId, null, { variantId: result.id, name: result.name });
+    return this.findVariants(productId);
+  }
+
+  /** Rename a flavor/color. */
+  async updateVariant(variantId: string, dto: UpdateVariantDto, userId: string) {
+    const variant = await this.prisma.productVariant.findFirst({
+      where: { id: variantId, deletedAt: null },
+      select: { id: true, productId: true, name: true },
+    });
+    if (!variant) throw new NotFoundException('Variant not found');
+
+    if (dto.name && dto.name.trim() !== variant.name) {
+      await this.prisma.productVariant.update({
+        where: { id: variantId },
+        data: { name: dto.name.trim() },
+      });
+      await this.audit(userId, 'PRODUCT_VARIANT_UPDATED', variant.productId, { name: variant.name }, { name: dto.name.trim() });
+    }
+    return this.findVariants(variant.productId);
+  }
+
+  /**
+   * Archive (soft-delete) a flavor/color. If it was the product's last active
+   * variant, the product flips back to "none". Stock rows are kept (so the
+   * record/history survives), but the variant stops appearing/selling.
+   */
+  async removeVariant(variantId: string, userId: string) {
+    const variant = await this.prisma.productVariant.findFirst({
+      where: { id: variantId, deletedAt: null },
+      select: { id: true, productId: true, name: true },
+    });
+    if (!variant) throw new NotFoundException('Variant not found');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.productVariant.update({
+        where: { id: variantId },
+        data: { deletedAt: new Date(), isActive: false },
+      });
+      const remaining = await tx.productVariant.count({
+        where: { productId: variant.productId, deletedAt: null },
+      });
+      if (remaining === 0) {
+        await tx.product.update({ where: { id: variant.productId }, data: { variantType: 'none' } });
+      }
+    });
+
+    await this.audit(userId, 'PRODUCT_VARIANT_ARCHIVED', variant.productId, { name: variant.name }, null);
+    return this.findVariants(variant.productId);
+  }
+
+  private serializeVariant(v: any) {
+    const quantities = (v.variantInventory ?? []).map((vi: any) => ({
+      branchId: vi.branchId,
+      branchName: vi.branch?.name ?? null,
+      quantity: vi.quantity,
+    }));
+    return {
+      id: v.id,
+      name: v.name,
+      isActive: v.isActive,
+      quantities,
+      totalQuantity: quantities.reduce((s: number, q: any) => s + q.quantity, 0),
+    };
+  }
+
   private async assertBranchesExist(quantities?: BranchQuantityDto[]) {
     if (!quantities?.length) return;
     const ids = [...new Set(quantities.map((q) => q.branchId))];
@@ -989,6 +1137,7 @@ export class ProductsService {
       name: true,
       slug: true,
       image: true,
+      variantType: true,
       sellingPrice: true,
       costPrice: true,
       quantityAlert: true,
@@ -1008,26 +1157,75 @@ export class ProductsService {
           branch: { select: { id: true, name: true } },
         },
       },
+      // Active variants (flavors/colors) + their per-branch stock. Empty for
+      // simple products (variantType = 'none').
+      variants: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+          variantInventory: {
+            where: branchId ? { branchId } : undefined,
+            select: {
+              branchId: true,
+              quantity: true,
+              branch: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
     };
   }
 
   private serialize(product: any, includeOwnerFields = false) {
     const defaultPrice = Number(product.sellingPrice);
-    const quantities = (product.inventory ?? []).map((inv: any) => ({
-      branchId: inv.branchId,
-      branchName: inv.branch?.name ?? null,
-      quantity: inv.quantity,
-      // If branch has its own price use it; otherwise show product's default
-      sellingPrice: inv.sellingPrice != null ? Number(inv.sellingPrice) : defaultPrice,
-      // Per-branch archive marker: when set, the product is removed from THIS
-      // branch only. null = active in this branch. The UI uses this to show
-      // "archived in this branch" and to offer restore on the Branch archive page.
-      archivedAt: inv.archivedAt ?? null,
-    }));
-    const totalQuantity = quantities.reduce(
-      (sum: number, q: any) => sum + q.quantity,
-      0,
-    );
+    const variantType: string = product.variantType ?? 'none';
+    const hasVariants = variantType !== 'none';
+
+    // Variants (flavors/colors) with per-branch stock. Prices are product-level.
+    const variants = (product.variants ?? []).map((v: any) => {
+      const vQuantities = (v.variantInventory ?? []).map((vi: any) => ({
+        branchId: vi.branchId,
+        branchName: vi.branch?.name ?? null,
+        quantity: vi.quantity,
+      }));
+      return {
+        id: v.id,
+        name: v.name,
+        isActive: v.isActive,
+        quantities: vQuantities,
+        totalQuantity: vQuantities.reduce((s: number, q: any) => s + q.quantity, 0),
+      };
+    });
+
+    const quantities = (product.inventory ?? []).map((inv: any) => {
+      // For variant products the branch's stock is the SUM of that branch's
+      // variant stock (the inventory row's own quantity is unused/0). For simple
+      // products it's the inventory row's quantity.
+      const branchVariantQty = hasVariants
+        ? variants.reduce(
+            (s: number, v: any) =>
+              s + (v.quantities.find((q: any) => q.branchId === inv.branchId)?.quantity ?? 0),
+            0,
+          )
+        : inv.quantity;
+      return {
+        branchId: inv.branchId,
+        branchName: inv.branch?.name ?? null,
+        quantity: branchVariantQty,
+        // If branch has its own price use it; otherwise show product's default
+        sellingPrice: inv.sellingPrice != null ? Number(inv.sellingPrice) : defaultPrice,
+        // Per-branch archive marker: when set, the product is removed from THIS
+        // branch only. null = active in this branch. The UI uses this to show
+        // "archived in this branch" and to offer restore on the Branch archive page.
+        archivedAt: inv.archivedAt ?? null,
+      };
+    });
+    const totalQuantity = hasVariants
+      ? variants.reduce((sum: number, v: any) => sum + v.totalQuantity, 0)
+      : quantities.reduce((sum: number, q: any) => sum + q.quantity, 0);
 
     // For the top-level sellingPrice: when one branch is filtered, use that branch's price.
     // When multiple branches (All Shops), use the product's base price as reference.
@@ -1044,6 +1242,8 @@ export class ProductsService {
         ? { id: product.brand.id, name: product.brand.name, slug: product.brand.slug }
         : null,
       sellingPrice: branchPrice,
+      variantType,
+      variants,
       quantityAlert: product.quantityAlert,
       sortOrder: product.sortOrder,
       isActive: product.isActive,
