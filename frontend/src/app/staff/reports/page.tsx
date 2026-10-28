@@ -564,7 +564,7 @@ export default function StaffDailyReportPage() {
                         <img
                           src={`/payments/${r.icon}.png`}
                           alt=""
-                          className="h-full w-full scale-110 object-cover"
+                          className="h-full w-full scale-[1.35] object-cover"
                         />
                       </span>
                     )}
