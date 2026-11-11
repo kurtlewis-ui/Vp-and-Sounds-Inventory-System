@@ -1,4 +1,5 @@
 'use client';
+import { sellableProducts } from '@/lib/product-options';
 
 import { Fragment, useMemo, useState } from 'react';
 import { Search, ShoppingCart, Pencil, Trash2, Check } from 'lucide-react';
@@ -848,7 +849,7 @@ export default function StaffDailyReportPage() {
       {editingSale && (
         <EditSaleModal
           sale={editingSale}
-          products={products}
+          products={sellableProducts(products)}
           isSaving={updateSale.isPending}
           onClose={() => setEditingSale(null)}
           onSave={async (payload) => {

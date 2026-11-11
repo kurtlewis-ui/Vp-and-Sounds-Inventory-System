@@ -1,4 +1,5 @@
 'use client';
+import { sellableProducts } from '@/lib/product-options';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -191,7 +192,7 @@ export default function DisposalsPage() {
 function RecordDisposalModal({ branches, onClose }: { branches: { id: string; name: string }[]; onClose: () => void }) {
   const [branchId, setBranchId] = useState(branches[0]?.id ?? '');
   const { data: productData } = useProducts({ branchId: branchId || undefined });
-  const products = productData?.data ?? [];
+  const products = sellableProducts(productData?.data ?? []);
   const createDisposal = useCreateDisposal();
 
   const [productId, setProductId] = useState('');

@@ -19,6 +19,10 @@ function peso(n: number | null | undefined) {
 }
 
 type StaffProduct = {
+  variantType?: 'NONE' | 'FLAVOR' | 'COLOR';
+  options?: StaffProduct[];
+  optionName?: string | null;
+  deletedAt?: string | null;
   id: string;
   name: string;
   image: string | null;
@@ -63,6 +67,8 @@ export default function BrandProductsPage() {
   const draftDisposalItems = useDraftStore((s) => s.disposalItems);
 
   function getDraftQty(productId: string): number {
+    const parent = products.find(p => p.id === productId);
+    if (parent?.variantType && parent.variantType !== 'NONE') return (parent.options ?? []).reduce((sum, o) => sum + getDraftQty(o.id), 0);
     const sellQty = draftItems.filter((i) => i.productId === productId).reduce((sum, i) => sum + i.quantity, 0);
     const disposeQty = draftDisposalItems.find((i) => i.productId === productId)?.quantity ?? 0;
     return sellQty + disposeQty;
@@ -187,7 +193,7 @@ export default function BrandProductsPage() {
 type ItemPaymentMethod = 'Cash' | 'Gcash' | 'BPI' | 'BDO' | 'Split';
 
 function AddPurchaseModal({
-  product,
+  product: parentProduct,
   onClose,
   onSaved,
 }: {
@@ -195,6 +201,9 @@ function AddPurchaseModal({
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
+  const [selectedOptionId, setSelectedOptionId] = useState('');
+  const needsOption = !!parentProduct.variantType && parentProduct.variantType !== 'NONE';
+  const product = needsOption ? (parentProduct.options ?? []).find(o => o.id === selectedOptionId && !o.deletedAt) ?? parentProduct : parentProduct;
   const [quantity, setQuantity] = useState('1');
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<ItemPaymentMethod | ''>('');
@@ -220,7 +229,7 @@ function AddPurchaseModal({
   // submitted, so both must be subtracted here or staff could stage more
   // than actually exists.
   const alreadyInCart =
-    (draftItems.find((i) => i.productId === product.id)?.quantity ?? 0) +
+    draftItems.filter(i => i.productId === product.id).reduce((sum, i) => sum + i.quantity, 0) +
     (draftDisposalItems.find((i) => i.productId === product.id)?.quantity ?? 0);
   const stock = product.totalQuantity;
   const available = Math.max(0, stock - alreadyInCart);
@@ -244,6 +253,7 @@ function AddPurchaseModal({
   const splitMismatch = Math.abs(splitRemainder) > 0.01;
 
   function validQty(): number | null {
+    if (needsOption && product.id === parentProduct.id) { setError('Select a flavor/color first.'); return null; }
     const qty = Number(quantity);
     if (!qty || qty < 1) { setError('Enter a quantity of at least 1.'); return null; }
     if (qty > available) {
@@ -328,6 +338,16 @@ function AddPurchaseModal({
       {/* max-h + overflow-y-auto so the whole form (incl. Save/Dispose buttons)
           stays reachable on small phone screens; lighter padding on mobile. */}
       <div className="glass relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl p-5 sm:p-8 shadow-xl">
+        {needsOption && <label className="block mb-4 text-sm font-medium">{parentProduct.variantType === 'FLAVOR' ? 'Flavor' : 'Color'}
+          <select aria-label="Choose flavor or color" value={selectedOptionId} onChange={e => { setSelectedOptionId(e.target.value); setQuantity('1'); setDirty(true); }} className="w-full rounded border border-input-border bg-input-bg px-3 py-2">
+            <option value="">Choose an option</option>
+            {(parentProduct.options ?? []).filter(o => !o.deletedAt).map(o => {
+              const staged = draftItems.filter(i => i.productId === o.id).reduce((sum, i) => sum + i.quantity, 0) + draftDisposalItems.filter(i => i.productId === o.id).reduce((sum, i) => sum + i.quantity, 0);
+              const remaining = Math.max(0, o.totalQuantity - staged);
+              return <option key={o.id} value={o.id} disabled={!remaining}>{o.optionName} — {remaining} available</option>;
+            })}
+          </select>
+        </label>}
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-lg font-bold text-text-primary">Add Purchase</h3>
           <button onClick={guardedClose} className="text-text-muted hover:text-text-primary transition"><X size={20} /></button>
