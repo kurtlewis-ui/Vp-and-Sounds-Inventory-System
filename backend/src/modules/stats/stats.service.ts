@@ -25,7 +25,7 @@ export class StatsService {
       approvedTotal,
     ] = await Promise.all([
       this.prisma.branch.count({ where: { deletedAt: null } }),
-      this.prisma.product.count({ where: { deletedAt: null } }),
+      this.prisma.product.count({ where: { deletedAt: null, parentId: null } }),
       this.prisma.brand.count({ where: { deletedAt: null } }),
       this.prisma.sale.count({ where: { status: SaleStatus.PENDING } }),
       this.prisma.sale.count({ where: { status: SaleStatus.APPROVED } }),

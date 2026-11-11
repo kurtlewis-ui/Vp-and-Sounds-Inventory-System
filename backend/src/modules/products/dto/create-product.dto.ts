@@ -2,6 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsIn,
+  IsBoolean,
+  ArrayMaxSize,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -15,6 +18,10 @@ import {
 } from 'class-validator';
 
 export class BranchQuantityDto {
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  expectedQuantity?: number;
   @ApiProperty({ description: 'Branch ID' })
   @IsUUID()
   branchId: string;
@@ -33,7 +40,38 @@ export class BranchQuantityDto {
   sellingPrice?: number;
 }
 
+export class ProductOptionDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(60)
+  name: string;
+
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BranchQuantityDto)
+  quantities?: BranchQuantityDto[];
+}
+
 export class CreateProductDto {
+  @IsOptional()
+  @IsIn(['NONE', 'FLAVOR', 'COLOR'])
+  variantType?: 'NONE' | 'FLAVOR' | 'COLOR';
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => ProductOptionDto)
+  options?: ProductOptionDto[];
   @ApiProperty({ example: 'Blue Razz Ice 5000' })
   @IsString()
   @IsNotEmpty()

@@ -49,7 +49,7 @@ export class BrandsService {
         coverImage: coverImage || null,
         isActive: dto.isActive ?? true,
       },
-      include: { _count: { select: { products: true } } },
+      include: { _count: { select: { products: { where: { parentId: null } } } } },
     });
 
     await this.audit(createdBy, 'BRAND_CREATED', brand.id, null, {
@@ -91,7 +91,7 @@ export class BrandsService {
       this.prisma.brand.count({ where }),
       this.prisma.brand.findMany({
         where,
-        include: { _count: { select: { products: true } } },
+        include: { _count: { select: { products: { where: { parentId: null } } } } },
         orderBy: { name: 'asc' },
         skip,
         take: limit,
@@ -110,7 +110,7 @@ export class BrandsService {
       const grouped = await this.prisma.product.groupBy({
         by: ['brandId'],
         where: {
-          brandId: { in: brands.map((b) => b.id) },
+          brandId: { in: brands.map((b) => b.id) }, parentId: null,
           deletedAt: null,
           inventory: { some: { branchId, archivedAt: null } },
         },
@@ -140,7 +140,7 @@ export class BrandsService {
       this.prisma.brand.count({ where }),
       this.prisma.brand.findMany({
         where,
-        include: { _count: { select: { products: true } } },
+        include: { _count: { select: { products: { where: { parentId: null } } } } },
         orderBy: { deletedAt: 'desc' },
         skip,
         take: limit,
@@ -156,7 +156,7 @@ export class BrandsService {
   async findOne(id: string) {
     const brand = await this.prisma.brand.findFirst({
       where: { id, deletedAt: null },
-      include: { _count: { select: { products: true } } },
+      include: { _count: { select: { products: { where: { parentId: null } } } } },
     });
     if (!brand) {
       throw new NotFoundException('Brand not found');
@@ -207,7 +207,7 @@ export class BrandsService {
     const updated = await this.prisma.brand.update({
       where: { id },
       data,
-      include: { _count: { select: { products: true } } },
+      include: { _count: { select: { products: { where: { parentId: null } } } } },
     });
 
     await this.audit(
@@ -339,7 +339,7 @@ export class BrandsService {
     const restored = await this.prisma.brand.update({
       where: { id },
       data: { deletedAt: null, isActive: true },
-      include: { _count: { select: { products: true } } },
+      include: { _count: { select: { products: { where: { parentId: null } } } } },
     });
 
     await this.audit(restoredBy, 'BRAND_RESTORED', id, null, {
