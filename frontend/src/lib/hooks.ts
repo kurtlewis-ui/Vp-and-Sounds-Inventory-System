@@ -348,6 +348,8 @@ export function useRestoreBrandToBranch() {
 // PRODUCTS
 // ===========================================================================
 export interface ProductMutationInput {
+  variantType?: 'NONE' | 'FLAVOR' | 'COLOR';
+  options?: { id?: string; name: string; archived?: boolean; quantities?: { branchId: string; quantity: number }[] }[];
   name: string;
   brandId: string;
   sellingPrice: number;
