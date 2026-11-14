@@ -1,4 +1,5 @@
 'use client';
+import { sellableProducts } from '@/lib/product-options';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1099,7 +1100,7 @@ export default function SalesPendingPage() {
       {editingSale && (
         <EditSaleModal
           sale={editingSale}
-          products={products}
+          products={sellableProducts(products)}
           isSaving={updateSale.isPending}
           onClose={() => setEditingSale(null)}
           onSave={async (payload) => {
