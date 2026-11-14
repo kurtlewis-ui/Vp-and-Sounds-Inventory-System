@@ -111,6 +111,10 @@ export interface ProductBranchQuantity {
 }
 
 export interface Product {
+  variantType?: 'NONE' | 'FLAVOR' | 'COLOR';
+  parentId?: string | null;
+  optionName?: string | null;
+  options?: Product[];
   id: string;
   name: string;
   slug: string;
