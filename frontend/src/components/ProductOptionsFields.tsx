@@ -158,6 +158,7 @@ export function ProductOptionsFields({
                 {optionRows.map((row, i) => {
                   const archivedHere =
                     !!row.archived || !!row.branchArchived?.[branchId];
+                  if (archivedHere) return null;
                   return (
                     <tr key={row.id ?? i}>
                       <td className="p-1 align-middle">
@@ -172,13 +173,6 @@ export function ProductOptionsFields({
                             variantType === "FLAVOR" ? "Mango" : "Black"
                           }
                         />
-                        {archivedHere && (
-                          <span className="text-xs text-text-muted">
-                            {row.archived
-                              ? "Archived globally"
-                              : "Archived at this branch"}
-                          </span>
-                        )}
                       </td>
                       <td className="p-1 align-middle">
                         <input
@@ -187,7 +181,7 @@ export function ProductOptionsFields({
                           step="1"
                           aria-label={`${row.name || "Option"} stock at ${branch?.name ?? "shop"}`}
                           value={row.quantities[branchId] ?? ""}
-                          disabled={archivedHere || !branchId}
+                          disabled={!branchId}
                           placeholder="0"
                           className={inputClass}
                           onChange={(e) =>
@@ -255,6 +249,13 @@ export function ProductOptionsFields({
                     </tr>
                   );
                 })}
+                {optionRows.every((row) => row.archived || row.branchArchived?.[branchId]) && (
+                  <tr>
+                    <td colSpan={3} className="p-3 text-text-muted">
+                      No active options at this branch. Restore archived options from the Archive menu.
+                    </td>
+                  </tr>
+                )}
                 <tr>
                   <th className="p-2 text-left">Available stock</th>
                   <td className="p-2 font-bold">
