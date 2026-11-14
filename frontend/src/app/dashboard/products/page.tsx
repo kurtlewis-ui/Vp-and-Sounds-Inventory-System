@@ -1,6 +1,7 @@
 'use client';
 
 import { ProductOptionsFields, StockBranchPicker, type ProductOptionsFieldsProps, type VariantType, type OptionFormRow } from '@/components/ProductOptionsFields';
+import { ALL_STOCK_BRANCHES, BulkBranchQuantity } from '@/components/BulkBranchQuantity';
 import { sellableProducts } from '@/lib/product-options';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Archive, X, Loader2, Upload, Download, RefreshCw, FileDown, ClipboardList, Trash2, GripVertical, ArrowUpDown, Check, AlertTriangle, ImagePlus, Store } from 'lucide-react';
@@ -320,6 +321,7 @@ export default function ProductsPage() {
 
   const optionFields: ProductOptionsFieldsProps = { variantType, setVariantType, optionRows, setOptionRows, stockBranchId, setStockBranchId,
     showBranchArchive: !!shopFilter,
+    excludedStockBranchIds: editingProduct?.quantities.filter(q => q.archivedAt).map(q => q.branchId),
     productName: formName, beforeArchive: beforeOptionArchive, onArchiveCompleted: optionArchiveCompleted,
     originalType: editingProduct?.variantType ?? 'NONE',
     allocation: editingProduct && (editingProduct.variantType ?? 'NONE') === 'NONE' && variantType !== 'NONE'
@@ -1162,9 +1164,12 @@ function ProductFormModal({ optionFields, priceScope, mixedPrices, title, onClos
         <ProductOptionsFields {...optionFields} branches={branches} onDirty={onDirty} />
         {optionFields.variantType === 'NONE' && <div className="space-y-3">
           <StockBranchPicker branches={branches} value={optionFields.stockBranchId} onChange={optionFields.setStockBranchId} />
-          <label className="block text-sm font-medium">Quantity</label>
-          <NumberStepper min={0} placeholder="0" ariaLabel="Quantity" value={formQuantities[optionFields.stockBranchId] ?? ''}
-            onChange={value => setFormQuantities({ ...formQuantities, [optionFields.stockBranchId]: value })} className="w-full" />
+          <label className="block text-sm font-medium">{optionFields.stockBranchId === ALL_STOCK_BRANCHES ? 'Quantity per branch' : 'Quantity'}</label>
+          {optionFields.stockBranchId === ALL_STOCK_BRANCHES ? <BulkBranchQuantity name={formName || 'Product'}
+            branchIds={branches.filter(b => !optionFields.excludedStockBranchIds?.includes(b.id)).map(b => b.id)} quantities={formQuantities}
+            onApply={quantities => { onDirty(); setFormQuantities(quantities); }} /> :
+            <NumberStepper min={0} placeholder="0" ariaLabel="Quantity" value={formQuantities[optionFields.stockBranchId] ?? ''}
+              onChange={value => setFormQuantities({ ...formQuantities, [optionFields.stockBranchId]: value })} className="w-full" />}
         </div>}
         <div>
           <label className="block text-sm font-medium text-text-primary mb-1">Brand <span className="text-accent-red">*</span></label>
