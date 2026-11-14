@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Search, X } from 'lucide-react';
+import { ArrowLeft, Search, X, RefreshCw } from 'lucide-react';
 import { useBrands, useProducts } from '@/lib/hooks';
 import { useAuthStore } from '@/lib/store';
 import { useDraftStore } from '@/lib/draft';
@@ -60,7 +60,7 @@ export default function BrandProductsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const { data, isLoading, isError, error } = useProducts({ brandId, branchId, search: debouncedSearch });
+  const { data, isLoading, isError, error, refetch, isFetching } = useProducts({ brandId, branchId, search: debouncedSearch, all: true, live: true });
   const products = (data?.data ?? []) as StaffProduct[];
 
   // Draft items for auto-subtracting stock display
@@ -100,6 +100,10 @@ export default function BrandProductsPage() {
             className="w-full rounded-lg border border-input-border bg-input-bg py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-input-focus"
           />
         </div>
+        <button type="button" onClick={() => refetch()} disabled={!branchId || isFetching} aria-label="Refresh products" title="Refresh products"
+          className="rounded-lg border border-input-border p-2 text-text-secondary disabled:opacity-40">
+          <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
+        </button>
       </div>
 
       {!branchId ? (

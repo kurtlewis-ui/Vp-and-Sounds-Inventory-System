@@ -14,9 +14,6 @@ function peso(n: number | null | undefined) {
 
 const PAGE_SIZES = [10, 25, 50, 'All'] as const;
 type PageSize = (typeof PAGE_SIZES)[number];
-// Backend caps a page at 200; "All" requests that max so every product shows
-// on one page.
-const ALL_LIMIT = 200;
 
 export default function StaffProductsPage() {
   const [brandId, setBrandId] = useState('');
@@ -39,7 +36,7 @@ export default function StaffProductsPage() {
   const brands = brandData?.data ?? [];
 
   const isAll = pageSize === 'All';
-  const effectiveLimit = isAll ? ALL_LIMIT : pageSize;
+  const effectiveLimit = isAll ? 200 : pageSize;
 
   const { data, isLoading, isError, error } = useProducts({
     branchId,
@@ -47,6 +44,8 @@ export default function StaffProductsPage() {
     search: debouncedSearch || undefined,
     page: isAll ? 1 : page,
     limit: effectiveLimit,
+    all: isAll,
+    live: true,
   });
   const products = data?.data ?? [];
   const pagination = data?.pagination;
