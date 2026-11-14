@@ -24,13 +24,13 @@ export function BulkBranchQuantity({ name, branchIds, quantities, onApply }: {
         aria-label={`${name} quantity per branch`} value={value}
         onInput={e => e.stopPropagation()}
         onChange={e => setValue(e.target.value)} placeholder="0"
-        className="w-full min-w-0 rounded-lg border border-input-border bg-input-bg px-3 py-2.5 text-sm" />
+        className="w-full min-w-0 min-h-11 rounded-lg border border-input-border bg-input-bg px-3 py-2.5 text-sm" />
       <p className="text-xs leading-relaxed text-text-muted">
         {valid ? `${quantity} × ${branchIds.length} branches = ${quantity * branchIds.length} total stock` : `Current total: ${currentTotal} across ${branchIds.length} branches`}
       </p>
       <button type="button" disabled={!valid || !branchIds.length}
         onClick={() => setConfirmQuantity(quantity)}
-        className="btn-secondary rounded-lg px-2 py-2 text-xs disabled:opacity-40">
+        className="btn-secondary w-full min-h-11 rounded-lg px-3 py-2.5 text-xs leading-relaxed disabled:opacity-40">
         Apply to all branches
       </button>
       {confirmQuantity !== null && createPortal(
