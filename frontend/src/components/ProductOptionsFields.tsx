@@ -1,6 +1,7 @@
 "use client";
 
 import { Select } from "./Select";
+import { Trash2 } from "lucide-react";
 import { OptionArchiveAction } from "./OptionArchiveAction";
 import { ALL_STOCK_BRANCHES, BulkBranchQuantity } from "./BulkBranchQuantity";
 
@@ -88,7 +89,7 @@ export function ProductOptionsFields({
     );
   };
   const inputClass =
-    "w-full rounded-lg border border-input-border bg-input-bg px-3 py-2.5 text-sm";
+    "w-full min-w-0 min-h-11 rounded-lg border border-input-border bg-input-bg px-3 py-2.5 text-sm";
   const total = optionRows
     .filter((r) => !r.archived && !r.branchArchived?.[branchId])
     .reduce((sum, row) => sum + (allBranches
@@ -143,11 +144,11 @@ export function ProductOptionsFields({
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr>
-                  <th className="w-[38%] p-2 text-left">
+                  <th className={`${allBranches ? "w-[34%]" : "w-[38%]"} px-1 py-2 text-left`}>
                     {variantType === "FLAVOR" ? "Flavor" : "Color"}
                   </th>
-                  <th className="w-[38%] p-2 text-left">{allBranches ? "Quantity per branch" : "Quantity"}</th>
-                  <th className="w-[24%] p-2 text-left">Actions</th>
+                  <th className={`${allBranches ? "w-[48%]" : "w-[38%]"} px-1 py-2 text-left`}>{allBranches ? "Quantity per branch" : "Quantity"}</th>
+                  <th className={`${allBranches ? "w-[18%]" : "w-[24%]"} px-1 py-2 text-center`}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,7 +158,7 @@ export function ProductOptionsFields({
                   if (archivedHere) return null;
                   return (
                     <tr key={row.id ?? i}>
-                      <td className="p-1 align-middle">
+                      <td className="px-1 py-3 align-top">
                         <input
                           aria-label={`Option ${i + 1} name`}
                           maxLength={60}
@@ -170,7 +171,7 @@ export function ProductOptionsFields({
                           }
                         />
                       </td>
-                      <td className="p-1 align-middle">
+                      <td className="px-1 py-3 align-top">
                         {allBranches ? <BulkBranchQuantity name={row.name || `Option ${i + 1}`}
                           branchIds={rowBranches(row).map(b => b.id)} quantities={row.quantities}
                           onApply={quantities => update(i, { quantities })} /> : <input
@@ -192,9 +193,9 @@ export function ProductOptionsFields({
                           }
                         />}
                       </td>
-                      <td className="p-1 align-middle">
+                      <td className="px-1 py-3 align-top text-center">
                         {row.id ? (
-                          <div className="flex items-center gap-1">
+                          <div className="flex min-h-11 items-center justify-center gap-1">
                             {showBranchArchive && !!branchId && (
                               <OptionArchiveAction
                                 id={row.id}
@@ -232,15 +233,17 @@ export function ProductOptionsFields({
                         ) : (
                           <button
                             type="button"
+                            aria-label={`Remove ${variantType === "FLAVOR" ? "flavor" : "color"} ${row.name || i + 1}`}
+                            title={`Remove ${variantType === "FLAVOR" ? "flavor" : "color"} ${row.name || i + 1}`}
                             onClick={() => {
                               onDirty();
                               setOptionRows(
                                 optionRows.filter((_, index) => index !== i),
                               );
                             }}
-                            className="p-2 text-accent-red"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-accent-red transition-colors hover:bg-accent-red/10"
                           >
-                            Remove
+                            <Trash2 size={17} />
                           </button>
                         )}
                       </td>
@@ -254,9 +257,9 @@ export function ProductOptionsFields({
                     </td>
                   </tr>
                 )}
-                <tr>
-                  <th className="p-2 text-left">Available stock</th>
-                  <td className="p-2 font-bold">
+                <tr className="border-t border-card-border">
+                  <th className="px-1 py-3 text-left">Available stock</th>
+                  <td className="px-1 py-3 font-bold">
                     {total}
                     {allocation && ` / ${allBranches ? activeBranches.reduce((sum, b) => sum + (allocation[b.id] ?? 0), 0) : allocation[branchId] ?? 0}`}
                   </td>
