@@ -2,6 +2,7 @@
 
 import { Select } from "./Select";
 import { OptionArchiveAction } from "./OptionArchiveAction";
+import { ALL_STOCK_BRANCHES, BulkBranchQuantity } from "./BulkBranchQuantity";
 
 export type VariantType = "NONE" | "FLAVOR" | "COLOR";
 export interface OptionFormRow {
@@ -19,6 +20,7 @@ export interface ProductOptionsFieldsProps {
   stockBranchId: string;
   setStockBranchId: (id: string) => void;
   showBranchArchive: boolean;
+  excludedStockBranchIds?: string[];
   originalType?: VariantType;
   allocation?: Record<string, number>;
   productName?: string;
@@ -48,7 +50,7 @@ export function StockBranchPicker({
         value={value}
         onChange={onChange}
         className="w-full"
-        options={branches.map((b) => ({ value: b.id, label: b.name }))}
+        options={[{ value: ALL_STOCK_BRANCHES, label: "All Branches" }, ...branches.map((b) => ({ value: b.id, label: b.name }))]}
       />
     </div>
   );
@@ -62,6 +64,7 @@ export function ProductOptionsFields({
   stockBranchId,
   setStockBranchId,
   showBranchArchive,
+  excludedStockBranchIds = [],
   originalType,
   allocation,
   productName,
@@ -73,8 +76,11 @@ export function ProductOptionsFields({
   branches: { id: string; name: string }[];
   onDirty: () => void;
 }) {
-  const branch = branches.find((b) => b.id === stockBranchId) ?? branches[0];
+  const allBranches = stockBranchId === ALL_STOCK_BRANCHES;
+  const branch = allBranches ? undefined : branches.find((b) => b.id === stockBranchId) ?? branches[0];
   const branchId = branch?.id ?? "";
+  const activeBranches = branches.filter(b => !excludedStockBranchIds.includes(b.id));
+  const rowBranches = (row: OptionFormRow) => activeBranches.filter(b => !row.branchArchived?.[b.id]);
   const update = (index: number, patch: Partial<OptionFormRow>) => {
     onDirty();
     setOptionRows(
@@ -85,7 +91,9 @@ export function ProductOptionsFields({
     "w-full rounded-lg border border-input-border bg-input-bg px-3 py-2.5 text-sm";
   const total = optionRows
     .filter((r) => !r.archived && !r.branchArchived?.[branchId])
-    .reduce((sum, row) => sum + (Number(row.quantities[branchId]) || 0), 0);
+    .reduce((sum, row) => sum + (allBranches
+      ? rowBranches(row).reduce((n, b) => n + (Number(row.quantities[b.id]) || 0), 0)
+      : Number(row.quantities[branchId]) || 0), 0);
   return (
     <section className="space-y-6">
       <div className="space-y-3">
@@ -127,9 +135,10 @@ export function ProductOptionsFields({
           )}
           <StockBranchPicker
             branches={branches}
-            value={branchId}
+            value={allBranches ? ALL_STOCK_BRANCHES : branchId}
             onChange={setStockBranchId}
           />
+          {allBranches && <p className="text-xs leading-relaxed text-text-muted">Enter a quantity per branch for each option, then apply it. Archived branches are skipped. Selecting All Branches alone changes no stock.</p>}
           <div className="overflow-x-auto">
             <table className="w-full table-fixed text-sm">
               <thead>
@@ -137,14 +146,14 @@ export function ProductOptionsFields({
                   <th className="w-[38%] p-2 text-left">
                     {variantType === "FLAVOR" ? "Flavor" : "Color"}
                   </th>
-                  <th className="w-[38%] p-2 text-left">Quantity</th>
+                  <th className="w-[38%] p-2 text-left">{allBranches ? "Quantity per branch" : "Quantity"}</th>
                   <th className="w-[24%] p-2 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {optionRows.map((row, i) => {
                   const archivedHere =
-                    !!row.archived || !!row.branchArchived?.[branchId];
+                    !!row.archived || (allBranches ? rowBranches(row).length === 0 : !!row.branchArchived?.[branchId]);
                   if (archivedHere) return null;
                   return (
                     <tr key={row.id ?? i}>
@@ -162,7 +171,9 @@ export function ProductOptionsFields({
                         />
                       </td>
                       <td className="p-1 align-middle">
-                        <input
+                        {allBranches ? <BulkBranchQuantity name={row.name || `Option ${i + 1}`}
+                          branchIds={rowBranches(row).map(b => b.id)} quantities={row.quantities}
+                          onApply={quantities => update(i, { quantities })} /> : <input
                           type="number"
                           min="0"
                           step="1"
@@ -179,7 +190,7 @@ export function ProductOptionsFields({
                               },
                             })
                           }
-                        />
+                        />}
                       </td>
                       <td className="p-1 align-middle">
                         {row.id ? (
@@ -236,7 +247,7 @@ export function ProductOptionsFields({
                     </tr>
                   );
                 })}
-                {optionRows.every((row) => row.archived || row.branchArchived?.[branchId]) && (
+                {optionRows.every((row) => row.archived || (allBranches ? rowBranches(row).length === 0 : row.branchArchived?.[branchId])) && (
                   <tr>
                     <td colSpan={3} className="p-3 text-text-muted">
                       No active options at this branch. Restore archived options from the Archive menu.
@@ -247,7 +258,7 @@ export function ProductOptionsFields({
                   <th className="p-2 text-left">Available stock</th>
                   <td className="p-2 font-bold">
                     {total}
-                    {allocation && ` / ${allocation[branchId] ?? 0}`}
+                    {allocation && ` / ${allBranches ? activeBranches.reduce((sum, b) => sum + (allocation[b.id] ?? 0), 0) : allocation[branchId] ?? 0}`}
                   </td>
                   <td />
                 </tr>
