@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Archive, Store, Undo2 } from "lucide-react";
 import { Modal } from "./Modal";
+import { useToast } from "./Toast";
 import { useChangeOptionArchive } from "@/lib/hooks";
 import { getApiErrorMessage } from "@/lib/api";
 
@@ -31,6 +32,7 @@ export function OptionArchiveAction({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const action = useChangeOptionArchive();
+  const toast = useToast();
   const verb = archived ? "Restore" : "Archive";
   const scope = branchId ? (branchName ?? "selected shop") : "all branches";
   const label = `${verb} ${name} ${branchId ? "at" : "across"} ${scope}`;
@@ -41,14 +43,19 @@ export function OptionArchiveAction({
     try {
       beforeAction?.();
       await action.mutateAsync({ id, branchId, restore: archived });
+      toast.success(
+        `${name} ${archived ? "restored" : "archived"} ${branchId ? "at" : "across"} ${scope}.`,
+        archived ? "Flavor/color restored" : "Flavor/color archived",
+      );
       onCompleted?.(archived);
       setOpen(false);
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error && !("response" in err)
           ? err.message
-          : getApiErrorMessage(err),
-      );
+          : getApiErrorMessage(err);
+      setError(message);
+      toast.error(message, `Couldn't ${verb.toLowerCase()} flavor/color`);
     }
   }
 

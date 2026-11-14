@@ -319,6 +319,7 @@ export default function ProductsPage() {
   }
 
   const optionFields: ProductOptionsFieldsProps = { variantType, setVariantType, optionRows, setOptionRows, stockBranchId, setStockBranchId,
+    showBranchArchive: !!shopFilter,
     productName: formName, beforeArchive: beforeOptionArchive, onArchiveCompleted: optionArchiveCompleted,
     originalType: editingProduct?.variantType ?? 'NONE',
     allocation: editingProduct && (editingProduct.variantType ?? 'NONE') === 'NONE' && variantType !== 'NONE'

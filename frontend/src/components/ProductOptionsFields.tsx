@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Select } from "./Select";
 import { OptionArchiveAction } from "./OptionArchiveAction";
 
@@ -19,6 +18,7 @@ export interface ProductOptionsFieldsProps {
   setOptionRows: (rows: OptionFormRow[]) => void;
   stockBranchId: string;
   setStockBranchId: (id: string) => void;
+  showBranchArchive: boolean;
   originalType?: VariantType;
   allocation?: Record<string, number>;
   productName?: string;
@@ -39,30 +39,16 @@ export function StockBranchPicker({
   value: string;
   onChange: (id: string) => void;
 }) {
-  const [search, setSearch] = useState("");
   if (branches.length <= 1) return null;
-  const matches = branches.filter(
-    (b) =>
-      b.id === value || b.name.toLowerCase().includes(search.toLowerCase()),
-  );
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium">Stock at branch</label>
-      <input
-        aria-label="Search stock branches"
-        type="search"
-        onInput={(e) => e.stopPropagation()}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search branches…"
-        className="min-w-0 w-full rounded-lg border border-input-border bg-input-bg px-3 py-2.5 text-sm"
-      />
       <Select
         ariaLabel="Stock branch"
         value={value}
         onChange={onChange}
         className="w-full"
-        options={matches.map((b) => ({ value: b.id, label: b.name }))}
+        options={branches.map((b) => ({ value: b.id, label: b.name }))}
       />
     </div>
   );
@@ -75,6 +61,7 @@ export function ProductOptionsFields({
   setOptionRows,
   stockBranchId,
   setStockBranchId,
+  showBranchArchive,
   originalType,
   allocation,
   productName,
@@ -197,7 +184,7 @@ export function ProductOptionsFields({
                       <td className="p-1 align-middle">
                         {row.id ? (
                           <div className="flex items-center gap-1">
-                            {!!branchId && (
+                            {showBranchArchive && !!branchId && (
                               <OptionArchiveAction
                                 id={row.id}
                                 name={`${productName ?? ""} — ${row.name}`}
