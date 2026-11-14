@@ -77,40 +77,41 @@ export function StockHistoryModal({ productId, productName, branchId, branchName
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="glass relative rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 p-4 border-b border-card-border shrink-0">
+        <div className="flex items-center justify-between gap-4 px-5 py-5 sm:px-6 border-b border-card-border shrink-0">
           <div className="min-w-0">
             <h3 className="truncate text-lg font-bold text-text-primary" title={`Product Activity Logs — ${productName}`}>Product Activity Logs — {productName}</h3>
-            <p className="text-xs text-text-muted mt-0.5 truncate">{branchName}</p>
+            <p className="text-xs text-text-muted mt-2 truncate">{branchName}</p>
           </div>
           <button onClick={onClose} className="shrink-0 text-text-muted hover:text-text-primary transition"><X size={20} /></button>
         </div>
 
-        {!!product?.options?.length && <label className="p-3 text-sm">Stock history for
-          <select aria-label="Stock history option" className="w-full bg-input-bg border border-input-border rounded p-2" value={optionId} onChange={e => { setOptionId(e.target.value); setPage(1); }}>
+        {!!product?.options?.length && <label className="block space-y-2 px-5 pt-5 pb-2 sm:px-6 text-sm shrink-0">
+          <span className="block font-medium">Stock history for</span>
+          <select aria-label="Stock history option" className="w-full min-h-11 bg-input-bg border border-input-border rounded-lg px-3 py-2.5" value={optionId} onChange={e => { setOptionId(e.target.value); setPage(1); }}>
             <option value="">{isOwner ? 'All flavors/colors and product history' : 'Original product / conversion history'}</option>
             {product.options.map(o => <option key={o.id} value={o.id}>{o.optionName}{o.deletedAt ? ' (Archived)' : ''}</option>)}
           </select>
         </label>}
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:px-6">
           {isLoading ? (
             <div className="py-10 text-center text-text-muted"><Loader2 className="inline animate-spin mr-2" size={16} />Loading history...</div>
           ) : movements.length === 0 ? (
             <div className="py-10 text-center text-text-muted">No stock movements recorded for this product at this branch.</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-5">
               {movements.map((m) => {
                 const canUndo = !!isOwner && m.id === latestId && isUndoable(m);
                 const afterUndo = m.quantityAfter - m.quantityChange; // reversing this movement
                 return (
-                <div key={m.id} className="border-b border-card-border pb-3 last:border-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-text-primary">{m.user ?? 'System'}</p>
-                    <p className="text-xs text-text-muted whitespace-nowrap">{formatDateTime(m.createdAt)}</p>
+                <div key={m.id} className="space-y-2 border-b border-card-border pb-5 last:border-0 last:pb-0">
+                  <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:justify-between sm:gap-4">
+                    <p className="min-w-0 break-words text-sm font-medium leading-relaxed text-text-primary">{m.user ?? 'System'}</p>
+                    <p className="shrink-0 text-xs leading-relaxed text-text-muted">{formatDateTime(m.createdAt)}</p>
                   </div>
-                  {isOwner && !optionId && <p className="text-sm font-semibold text-text-primary mt-1">{m.productName}</p>}
-                  <p className="text-sm text-text-secondary mt-0.5">{m.description || typeLabel(m.type)}</p>
-                  <p className="text-sm mt-0.5">
+                  {isOwner && !optionId && <p className="text-sm font-semibold leading-relaxed text-text-primary">{m.productName}</p>}
+                  <p className="text-sm leading-relaxed text-text-secondary">{m.description || typeLabel(m.type)}</p>
+                  <p className="text-sm leading-relaxed">
                     <span className="text-text-secondary">Remaining Quantity: </span>
                     <span className="font-medium text-text-primary">{m.quantityAfter}</span>
                     {' '}
