@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { matchesProductSearch } from '@/lib/product-search';
 import { useBrands, useProducts } from '@/lib/hooks';
 import { Select } from '@/components/Select';
 import { useAuthStore } from '@/lib/store';
@@ -38,19 +39,21 @@ export default function StaffProductsPage() {
   const isAll = pageSize === 'All';
   const effectiveLimit = isAll ? 200 : pageSize;
 
-  const { data, isLoading, isError, error } = useProducts({
+  const { data, isLoading, isError, error, refetch, isFetching } = useProducts({
     branchId,
     brandId: brandId || undefined,
-    search: debouncedSearch || undefined,
+    search: isAll ? undefined : debouncedSearch || undefined,
     page: isAll ? 1 : page,
     limit: effectiveLimit,
     all: isAll,
-    live: true,
+    requireBranch: true,
   });
-  const products = data?.data ?? [];
+  const products = useMemo(() => isAll
+    ? (data?.data ?? []).filter(product => matchesProductSearch(product, debouncedSearch, branchId))
+    : data?.data ?? [], [data?.data, isAll, debouncedSearch, branchId]);
   const pagination = data?.pagination;
   const totalPages = isAll ? 1 : (pagination?.totalPages ?? 1);
-  const total = pagination?.total ?? products.length;
+  const total = isAll ? products.length : pagination?.total ?? products.length;
 
   const startIndex = total === 0 ? 0 : isAll ? 1 : (page - 1) * effectiveLimit + 1;
   const endIndex = isAll ? total : Math.min(page * effectiveLimit, total);
@@ -70,6 +73,10 @@ export default function StaffProductsPage() {
             <Select value={String(pageSize)} onChange={(v) => { setPageSize(v === 'All' ? 'All' : (Number(v) as PageSize)); setPage(1); }} ariaLabel="Entries per page" className="w-auto min-w-[80px]" options={PAGE_SIZES.map((s) => ({ value: String(s), label: String(s) }))} />
             entries
           </label>
+          <button type="button" onClick={() => refetch()} disabled={!branchId || isFetching} aria-label="Refresh products" title="Refresh products"
+            className="rounded-lg border border-input-border p-2 text-text-secondary disabled:opacity-40">
+            <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
+          </button>
           <input
             type="text"
             placeholder="Search products..."

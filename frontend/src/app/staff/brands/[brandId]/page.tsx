@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { matchesProductSearch } from '@/lib/product-search';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Search, X, RefreshCw } from 'lucide-react';
 import { useBrands, useProducts } from '@/lib/hooks';
@@ -52,16 +53,15 @@ export default function BrandProductsPage() {
   const { data: brandData } = useBrands();
   const brand = (brandData?.data ?? []).find((b) => b.id === brandId);
 
-  // Debounce search by 300ms so typing fires one request after the user stops,
-  // instead of one request per keystroke (matches the pattern on the brands /
-  // staff landing pages).
+  // Search the complete cached catalogue locally; typing makes no API request.
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useProducts({ brandId, branchId, search: debouncedSearch, all: true, live: true });
-  const products = (data?.data ?? []) as StaffProduct[];
+  const { data, isLoading, isError, error, refetch, isFetching } = useProducts({ brandId, branchId, all: true, requireBranch: true });
+  const products = useMemo(() => ((data?.data ?? []) as StaffProduct[])
+    .filter(product => matchesProductSearch(product, debouncedSearch, branchId)), [data?.data, debouncedSearch, branchId]);
 
   // Draft items for auto-subtracting stock display
   const draftItems = useDraftStore((s) => s.items);

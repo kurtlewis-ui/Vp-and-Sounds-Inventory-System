@@ -363,12 +363,14 @@ export interface ProductMutationInput {
   quantities?: { branchId: string; quantity: number }[];
 }
 
-export function useProducts(params?: { search?: string; brandId?: string; branchId?: string; page?: number; limit?: number; all?: boolean; live?: boolean }) {
+export function useProducts(params?: { search?: string; brandId?: string; branchId?: string; page?: number; limit?: number; all?: boolean; requireBranch?: boolean }) {
   return useQuery({
     queryKey: ['products', params ?? {}],
-    enabled: !params?.live || !!params?.branchId,
-    refetchOnWindowFocus: params?.live ? 'always' : false,
-    refetchInterval: params?.live ? shouldPollSlow : false,
+    enabled: !params?.requireBranch || !!params?.branchId,
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
+    refetchOnMount: params?.requireBranch ? false : true,
+    refetchOnReconnect: !params?.requireBranch,
     queryFn: async ({ signal }) => {
       const filters = {
         limit: params?.all ? 200 : params?.limit ?? 20,
