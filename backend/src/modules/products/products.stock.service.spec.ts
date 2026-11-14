@@ -35,7 +35,7 @@ describe('ProductsService — stock safety', () => {
         createManyAndReturn: jest.fn(),
       },
       auditLog: { create: jest.fn() },
-      $executeRaw: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
     };
     // $transaction supports BOTH forms used in the service:

@@ -27,6 +27,7 @@ export async function saveProductOptions(
         throw new BadRequestException('A product with options must keep its flavor/color type.');
       if (current && current.variantType !== 'NONE' && current.variantType !== type)
         throw new BadRequestException('The flavor/color type cannot change once options exist.');
+      if (dto.applyPriceToAllBranches && dto.sellingPrice === undefined) throw new BadRequestException('Enter the selling price to apply to all shops.');
       const options =
         dto.options ??
         (current?.options ?? []).map((o) => ({
@@ -34,7 +35,7 @@ export async function saveProductOptions(
           name: o.optionName!,
           archived: !!o.deletedAt,
         }));
-      if (!options.length || options.every((o) => o.archived))
+      if (!options.length)
         throw new BadRequestException('Add at least one active flavor/color.');
       const names = options.map((o) => o.name.trim().toLocaleLowerCase());
       if (names.some((n) => !n) || new Set(names).size !== names.length)
@@ -120,6 +121,7 @@ export async function saveProductOptions(
       for (const branchId of parentBranches) {
         const old = current?.inventory.find((i) => i.branchId === branchId);
         const price =
+          (dto.applyPriceToAllBranches ? dto.sellingPrice : undefined) ??
           dto.quantities?.find((q) => q.branchId === branchId)?.sellingPrice ??
           old?.sellingPrice ??
           parent.sellingPrice;
@@ -150,17 +152,9 @@ export async function saveProductOptions(
             'Existing option names cannot be changed; add a new option instead.',
           );
         const quantities = 'quantities' in input ? (input.quantities ?? []) : [];
-        if (input.archived && !old) throw new BadRequestException('New options must be active.');
-        if (input.archived && old && !old.deletedAt) {
-          if (
-            old.inventory.some((i) => i.quantity !== 0) ||
-            quantities.some((q) => q.quantity !== 0)
-          )
-            throw new BadRequestException(`Clear ${input.name}'s stock before archiving it.`);
-          await assertNoOpenWork(tx, [old.id]);
+        if (input.archived !== undefined && input.archived !== !!old?.deletedAt) {
+          throw new BadRequestException('Use the Archive or Restore action to change option status.');
         }
-        if (old?.deletedAt && quantities.some((q) => q.quantity !== 0) && input.archived)
-          throw new BadRequestException('Restore this option before adding stock.');
         const data = {
           name: `${parent.name} — ${input.name.trim()}`,
           slug: slugify(`${parent.name}-${input.name}`),
@@ -170,7 +164,7 @@ export async function saveProductOptions(
           sellingPrice: parent.sellingPrice,
           costPrice: parent.costPrice,
           quantityAlert: parent.quantityAlert,
-          deletedAt: input.archived ? (old?.deletedAt ?? new Date()) : null,
+          deletedAt: old?.deletedAt ?? null,
         };
         const option = old
           ? await tx.product.update({ where: { id: old.id }, data })
@@ -184,6 +178,9 @@ export async function saveProductOptions(
             );
           }
           const quantity = supplied?.quantity ?? previous?.quantity ?? 0;
+          if ((old?.deletedAt || previous?.archivedAt) && quantity !== (previous?.quantity ?? 0)) {
+            throw new BadRequestException('Restore this flavor/color at the shop before changing its stock.');
+          }
           const parentInv = await tx.inventory.findUniqueOrThrow({
             where: { productId_branchId: { productId: parent.id, branchId } },
           });

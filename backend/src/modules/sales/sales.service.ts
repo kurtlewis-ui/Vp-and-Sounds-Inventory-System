@@ -596,6 +596,8 @@ export class SalesService {
         WHERE "product_id" = ${item.productId}::uuid
           AND "branch_id" = ${branchId}::uuid
           AND "quantity" >= ${item.quantity}
+          AND "archived_at" IS NULL
+          AND EXISTS (SELECT 1 FROM "products" p WHERE p."id" = "inventory"."product_id" AND p."deleted_at" IS NULL)
         RETURNING "quantity"
       `);
 

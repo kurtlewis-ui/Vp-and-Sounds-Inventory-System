@@ -62,6 +62,8 @@ const ownerNavItems: NavItem[] = [
       { label: 'Branch Brand Archive', href: '/dashboard/archive/branch-brands' },
       { label: 'Products Archive', href: '/dashboard/archive/products' },
       { label: 'Branch Product Archive', href: '/dashboard/archive/branch-products' },
+      { label: 'Flavors/Colors Archive', href: '/dashboard/archive/options' },
+      { label: 'Branch Flavor/Color Archive', href: '/dashboard/archive/branch-options' },
     ],
   },
 ];

@@ -23,6 +23,7 @@ type StaffProduct = {
   options?: StaffProduct[];
   optionName?: string | null;
   deletedAt?: string | null;
+  quantities?: { branchId: string; archivedAt?: string | null }[];
   id: string;
   name: string;
   image: string | null;
@@ -203,7 +204,7 @@ function AddPurchaseModal({
 }) {
   const [selectedOptionId, setSelectedOptionId] = useState('');
   const needsOption = !!parentProduct.variantType && parentProduct.variantType !== 'NONE';
-  const product = needsOption ? (parentProduct.options ?? []).find(o => o.id === selectedOptionId && !o.deletedAt) ?? parentProduct : parentProduct;
+  const product = needsOption ? (parentProduct.options ?? []).find(o => o.id === selectedOptionId && !o.deletedAt && !o.quantities?.[0]?.archivedAt) ?? parentProduct : parentProduct;
   const [quantity, setQuantity] = useState('1');
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<ItemPaymentMethod | ''>('');

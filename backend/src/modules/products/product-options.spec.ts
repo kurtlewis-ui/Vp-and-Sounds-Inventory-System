@@ -68,9 +68,9 @@ describe('Product flavor/color stock rules', () => {
     await expect(saveProductOptions(prisma, { variantType: 'FLAVOR', options: [option()] }, 'owner', 'parent')).rejects.toThrow('cannot change');
     await expect(saveProductOptions(prisma, { variantType: 'COLOR', options: [option()] }, 'owner', 'parent')).rejects.toThrow('Keep existing');
   });
-  it('rejects archiving an option with stock, even if the request tries to zero it at the same time', async () => {
+  it('requires the dedicated archive action when a product form tries to change archive status', async () => {
     const { prisma } = fixture(parent({ variantType: 'COLOR', options: [sku(), sku({ id: 'blue', optionName: 'Blue', inventory: [] })] }));
-    await expect(saveProductOptions(prisma, { options: [option({ id: 'black', archived: true, quantities: [{ branchId: branch, quantity: 0 }] }), option({ id: 'blue', name: 'Blue', quantities: [] })] }, 'owner', 'parent')).rejects.toThrow('stock before archiving');
+    await expect(saveProductOptions(prisma, { options: [option({ id: 'black', archived: true, quantities: [{ branchId: branch, quantity: 0 }] }), option({ id: 'blue', name: 'Blue', quantities: [] })] }, 'owner', 'parent')).rejects.toThrow('Use the Archive or Restore');
   });
   it('rejects stock edits based on stale quantities rather than overwriting a sale', async () => {
     const { prisma } = fixture(parent({ variantType: 'COLOR', inventory: [{ branchId: branch, quantity: 0 }], options: [sku()] }));
@@ -94,6 +94,25 @@ describe('Product flavor/color stock rules', () => {
     expect(hiddenOptionWrite.create.quantity).toBe(7);
     expect(hiddenOptionWrite.update).toEqual({ sellingPrice: 600 });
     expect(tx.stockMovement.create.mock.calls).toHaveLength(1);
+  });
+
+  it('applies an explicit All Shops price to existing branch prices', async () => {
+    const { prisma, tx } = fixture(parent({ variantType: 'COLOR',
+      inventory: [{ branchId: branch, quantity: 0, sellingPrice: 550 }, { branchId: 'branch-b', quantity: 0, sellingPrice: 600 }], options: [sku()] }));
+    await saveProductOptions(prisma, { sellingPrice: 700, applyPriceToAllBranches: true }, 'owner', 'parent');
+    const parentWrites = tx.inventory.upsert.mock.calls.map(([input]: any[]) => input).filter((input: any) => input.where.productId_branchId.productId === 'parent');
+    expect(parentWrites).toHaveLength(2);
+    expect(parentWrites.every((input: any) => input.update.sellingPrice === 700)).toBe(true);
+  });
+
+  it('excludes branch-archived stock from available totals while retaining its stored quantity', async () => {
+    const row = parent({ variantType: 'COLOR', inventory: [{ branchId: branch, quantity: 0 }],
+      options: [sku({ sellingPrice: 500, inventory: [{ branchId: branch, quantity: 9, archivedAt: new Date() }] })] });
+    const service = new ProductsService({ product: { findFirst: jest.fn(async () => row) } } as any, {} as any);
+    const result = await service.findOne('parent', 'Owner');
+    expect(result.totalQuantity).toBe(0);
+    expect(result.options[0].totalQuantity).toBe(0);
+    expect(result.options[0].quantities[0].quantity).toBe(9);
   });
 
   it('serializes totals from active options and never leaks option cost to Admin/Staff/Viewer', async () => {

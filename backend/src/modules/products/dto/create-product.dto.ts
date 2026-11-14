@@ -63,6 +63,10 @@ export class ProductOptionDto {
 
 export class CreateProductDto {
   @IsOptional()
+  @IsBoolean()
+  applyPriceToAllBranches?: boolean;
+
+  @IsOptional()
   @IsIn(['NONE', 'FLAVOR', 'COLOR'])
   variantType?: 'NONE' | 'FLAVOR' | 'COLOR';
 

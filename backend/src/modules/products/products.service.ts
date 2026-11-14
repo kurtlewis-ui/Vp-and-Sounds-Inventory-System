@@ -12,6 +12,8 @@ import { ImportProductRowDto } from './dto/import-products.dto';
 import { RestockItemDto } from './dto/restock.dto';
 import { slugify } from '../../common/utils/string.util';
 // (UndoStockDto is validated at the controller; the service takes the id list.)
+import { changeOptionArchive, listOptionArchives } from './option-archives';
+import { QueryOptionArchiveDto } from './dto/option-archive.dto';
 import { saveProductOptions } from './product-options';
 import { UploadService } from '../../common/upload/upload.service';
 
@@ -21,6 +23,9 @@ export class ProductsService {
     private prisma: PrismaService,
     private upload: UploadService,
   ) {}
+
+  optionArchives(query: QueryOptionArchiveDto) { return listOptionArchives(this.prisma, query); }
+  archiveOption(id: string, userId: string, restore: boolean, branchId?: string) { return changeOptionArchive(this.prisma, id, userId, restore, branchId); }
 
   async create(dto: CreateProductDto, createdBy: string, role?: string) {
     if (dto.variantType && dto.variantType !== 'NONE') {
@@ -289,7 +294,8 @@ export class ProductsService {
     }
     if (dto.image !== undefined) data.image = await this.upload.uploadDataUrl(dto.image?.trim() || null, 'products');
     if (dto.brandId !== undefined) data.brandId = dto.brandId;
-    if (dto.sellingPrice !== undefined) data.sellingPrice = dto.sellingPrice;
+    if (dto.applyPriceToAllBranches && dto.sellingPrice === undefined) throw new BadRequestException('Enter the selling price to apply to all shops.');
+    if (dto.sellingPrice !== undefined && !dto.applyPriceToAllBranches) data.sellingPrice = dto.sellingPrice;
     // Owner-only cost price: persist ONLY when a value is explicitly provided so
     // that a normal edit (which omits costPrice) never overwrites the stored
     // cost back to 0. Non-owner edits never include costPrice in the payload.
@@ -328,14 +334,17 @@ export class ProductsService {
       const movementOpIndexes: number[] = [];
       for (const q of dto.quantities) {
         const oldQty = oldQtyByBranch.get(q.branchId) ?? 0;
-        const newQty = q.quantity;
+        const changesStock = q.expectedQuantity === undefined || q.quantity !== q.expectedQuantity;
+        if (changesStock && q.expectedQuantity !== undefined && q.expectedQuantity !== oldQty) throw new BadRequestException('Stock changed while editing. Refresh the product and retry.');
+        const newQty = changesStock ? q.quantity : oldQty;
         const diff = newQty - oldQty;
 
+        const branchSellingPrice = dto.applyPriceToAllBranches ? undefined : q.sellingPrice;
         ops.push(
           this.prisma.inventory.upsert({
             where: { productId_branchId: { productId: id, branchId: q.branchId } },
-            create: { productId: id, branchId: q.branchId, quantity: q.quantity, sellingPrice: q.sellingPrice ?? null },
-            update: { quantity: q.quantity, ...(q.sellingPrice !== undefined ? { sellingPrice: q.sellingPrice ?? null } : {}) },
+            create: { productId: id, branchId: q.branchId, quantity: q.quantity, sellingPrice: branchSellingPrice ?? null },
+            update: { ...(changesStock ? { quantity: q.quantity } : {}), ...(branchSellingPrice !== undefined ? { sellingPrice: branchSellingPrice } : {}) },
           }),
         );
 
@@ -367,6 +376,13 @@ export class ProductsService {
       }
     }
 
+    if (dto.applyPriceToAllBranches) {
+      await this.prisma.$transaction(async tx => {
+        await tx.product.update({ where: { id }, data: { sellingPrice: dto.sellingPrice } });
+        await tx.inventory.updateMany({ where: { productId: id }, data: { sellingPrice: dto.sellingPrice } });
+      });
+      data.sellingPrice = dto.sellingPrice;
+    }
     const updated = await this.prisma.product.findUnique({
       where: { id },
       include: this.includeFull(),
@@ -695,7 +711,7 @@ export class ProductsService {
     // Products: only active products whose brand isn't archived can be restocked.
     const products = await this.prisma.product.findMany({
       where: { deletedAt: null, variantType: 'NONE', brand: { deletedAt: null }, OR: [{ parentId: null }, { parent: { deletedAt: null } }] },
-      select: { id: true, name: true, parentId: true, parent: { select: { inventory: { select: { branchId: true, archivedAt: true } } } } },
+      select: { id: true, name: true, parentId: true, inventory: { select: { branchId: true, archivedAt: true } }, parent: { select: { inventory: { select: { branchId: true, archivedAt: true } } } } },
     });
     const productById = new Map(products.map((p) => [p.id, p]));
     const productByName = new Map(products.map((p) => [p.name.trim().toLowerCase(), p]));
@@ -736,6 +752,10 @@ export class ProductsService {
       }
       if (product.parentId && !product.parent?.inventory.some(i => i.branchId === branch.id && !i.archivedAt)) {
         warnings.push(`Row ${index + 1}: configure this product at ${branch.name} in Edit Product before restocking.`);
+        continue;
+      }
+      if (product.inventory?.some(i => i.branchId === branch.id && i.archivedAt)) {
+        warnings.push(`Row ${index + 1}: restore this product/flavor/color at ${branch.name} before restocking.`);
         continue;
       }
       const matchingNames = products.filter(p => p.name.trim().toLowerCase() === product.name.trim().toLowerCase());
@@ -808,6 +828,8 @@ export class ProductsService {
       SET "quantity" = inv."quantity" + v.add, "updated_at" = NOW()
       FROM (VALUES ${Prisma.join(valueRows)}) AS v(pid, bid, add)
       WHERE inv."product_id" = v.pid AND inv."branch_id" = v.bid
+        AND inv."archived_at" IS NULL
+        AND EXISTS (SELECT 1 FROM "products" p WHERE p."id" = inv."product_id" AND p."deleted_at" IS NULL)
     `;
 
     // Everything in ONE transaction (all-or-nothing): create missing rows,
@@ -820,7 +842,8 @@ export class ProductsService {
           skipDuplicates: true,
         });
       }
-      await tx.$executeRaw(bulkIncrement);
+      const updatedCount = await tx.$executeRaw(bulkIncrement);
+      if (updatedCount !== targets.length) throw new BadRequestException('Stock availability changed. Refresh and retry the restock.');
       return tx.stockMovement.createManyAndReturn({
         data: movementData,
         select: { id: true },
@@ -957,6 +980,7 @@ export class ProductsService {
           const inv = await tx.inventory.findUnique({
             where: { productId_branchId: { productId: movement.productId, branchId: movement.branchId } },
           });
+          if (inv?.archivedAt) throw new BadRequestException('Restore this flavor/color at the shop before changing its stock.');
           const currentQty = inv?.quantity ?? 0;
           const reverseDelta = -movement.quantityChange; // inverse of the original
           const newQty = currentQty + reverseDelta;
@@ -1081,7 +1105,7 @@ export class ProductsService {
       branchId: inv.branchId,
       branchName: inv.branch?.name ?? null,
       quantity: product.variantType && product.variantType !== 'NONE'
-        ? options.filter((o: any) => !o.deletedAt).reduce((sum: number, o: any) => sum + (o.quantities.find((q: any) => q.branchId === inv.branchId)?.quantity ?? 0), 0)
+        ? options.filter((o: any) => !o.deletedAt).reduce((sum: number, o: any) => sum + (o.quantities.find((q: any) => q.branchId === inv.branchId && !q.archivedAt)?.quantity ?? 0), 0)
         : inv.quantity,
       // If branch has its own price use it; otherwise show product's default
       sellingPrice: inv.sellingPrice != null ? Number(inv.sellingPrice) : defaultPrice,
@@ -1091,7 +1115,7 @@ export class ProductsService {
       archivedAt: inv.archivedAt ?? null,
     }));
     const totalQuantity = quantities.reduce(
-      (sum: number, q: any) => sum + q.quantity,
+      (sum: number, q: any) => sum + (q.archivedAt ? 0 : q.quantity),
       0,
     );
 
