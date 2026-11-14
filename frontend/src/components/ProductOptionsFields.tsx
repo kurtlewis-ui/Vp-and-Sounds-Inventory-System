@@ -104,21 +104,22 @@ export function ProductOptionsFields({
         >
           Product type
         </label>
-        <select
+        <Select
           id="product-option-type"
-          aria-label="Product type"
+          ariaLabel="Product type"
           value={variantType}
           disabled={!!originalType && originalType !== "NONE"}
-          onChange={(e) => {
+          onChange={(value) => {
             onDirty();
-            setVariantType(e.target.value as VariantType);
+            setVariantType(value as VariantType);
           }}
-          className={inputClass}
-        >
-          <option value="NONE">No flavor/color</option>
-          <option value="FLAVOR">With flavors</option>
-          <option value="COLOR">With colors</option>
-        </select>
+          className="w-full"
+          options={[
+            { value: "NONE", label: "No flavor/color" },
+            { value: "FLAVOR", label: "With flavors" },
+            { value: "COLOR", label: "With colors" },
+          ]}
+        />
         {variantType !== "NONE" && (
           <p className="text-xs leading-relaxed text-text-muted">
             Each {variantType === "FLAVOR" ? "flavor" : "color"} has its own

@@ -27,7 +27,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  dropdown?: { label: string; href: string }[];
+  dropdown?: { label: string; href: string; group?: string }[];
 }
 
 const ownerNavItems: NavItem[] = [
@@ -52,18 +52,14 @@ const ownerNavItems: NavItem[] = [
     href: '/dashboard/archive',
     icon: <Archive size={18} />,
     dropdown: [
-      // Ordered by domain, parent before child: people, locations, then the
-      // catalog (Brands → Products → per-branch Products).
-      // Each global archive sits next to its per-branch version:
-      // Users -> Shops -> Brands (+ Branch Brand) -> Products (+ Branch Product).
-      { label: 'Users Archive', href: '/dashboard/archive/users' },
-      { label: 'Shops Archive', href: '/dashboard/archive/shops' },
-      { label: 'Brands Archive', href: '/dashboard/archive/brands' },
-      { label: 'Branch Brand Archive', href: '/dashboard/archive/branch-brands' },
-      { label: 'Products Archive', href: '/dashboard/archive/products' },
-      { label: 'Branch Product Archive', href: '/dashboard/archive/branch-products' },
-      { label: 'Flavors/Colors Archive', href: '/dashboard/archive/options' },
-      { label: 'Branch Flavor/Color Archive', href: '/dashboard/archive/branch-options' },
+      { label: 'Users', href: '/dashboard/archive/users', group: 'General Archives' },
+      { label: 'Shops', href: '/dashboard/archive/shops', group: 'General Archives' },
+      { label: 'Brands', href: '/dashboard/archive/brands', group: 'General Archives' },
+      { label: 'Products', href: '/dashboard/archive/products', group: 'General Archives' },
+      { label: 'Flavors / Colors', href: '/dashboard/archive/options', group: 'General Archives' },
+      { label: 'Brands', href: '/dashboard/archive/branch-brands', group: 'Branch Archives' },
+      { label: 'Products', href: '/dashboard/archive/branch-products', group: 'Branch Archives' },
+      { label: 'Flavors / Colors', href: '/dashboard/archive/branch-options', group: 'Branch Archives' },
     ],
   },
 ];
@@ -293,20 +289,28 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     a flyout within the already-glass sidebar. */}
                 {hasDropdown && isOpen && (
                   <div className="ml-6 mt-1 space-y-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-1 backdrop-blur-sm">
-                    {item.dropdown!.map((sub) => {
+                    {item.dropdown!.map((sub, index) => {
                       const subActive = pathname === sub.href;
+                      const startsGroup = sub.group && sub.group !== item.dropdown![index - 1]?.group;
                       return (
-                        <Link
-                          key={sub.href}
-                          href={sub.href}
-                          className={`block px-3 py-2 text-sm rounded-md transition-colors ${
-                            subActive
-                              ? 'text-white bg-white/5'
-                              : 'text-nav-text hover:text-white hover:bg-white/5'
-                          }`}
-                        >
-                          {sub.label}
-                        </Link>
+                        <div key={sub.href}>
+                          {startsGroup && <p className={`px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wide text-nav-text ${index > 0 ? 'mt-2 border-t border-white/10' : ''}`}>
+                            {sub.group}
+                          </p>}
+                          <Link
+                            href={sub.href}
+                            aria-label={sub.group ? `${sub.group}: ${sub.label}` : undefined}
+                            title={sub.group ? `${sub.group}: ${sub.label}` : undefined}
+                            aria-current={subActive ? 'page' : undefined}
+                            className={`block px-3 py-2 text-sm rounded-md transition-colors ${
+                              subActive
+                                ? 'font-medium text-white bg-white/10'
+                                : 'text-nav-text hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {sub.label}
+                          </Link>
+                        </div>
                       );
                     })}
                   </div>
