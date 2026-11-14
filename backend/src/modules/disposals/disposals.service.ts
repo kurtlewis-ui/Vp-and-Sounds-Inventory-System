@@ -25,7 +25,7 @@ export class DisposalsService {
 
     const product = await this.prisma.product.findFirst({
       // Block archived products AND products from an archived brand.
-      where: { id: dto.productId, deletedAt: null, brand: { deletedAt: null } },
+      where: { id: dto.productId, variantType: 'NONE', deletedAt: null, brand: { deletedAt: null }, OR: [{ parentId: null }, { parent: { deletedAt: null, inventory: { some: { branchId, archivedAt: null } } } }] },
       include: { brand: { select: { name: true } } },
     });
     if (!product) {

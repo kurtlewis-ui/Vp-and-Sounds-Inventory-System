@@ -31,7 +31,7 @@ export class SalesService {
     // archived brand/product must not be sellable.
     const productIds = [...new Set(dto.items.map((i) => i.productId))];
     const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, deletedAt: null, brand: { deletedAt: null } },
+      where: { id: { in: productIds }, variantType: 'NONE', deletedAt: null, brand: { deletedAt: null }, OR: [{ parentId: null }, { parent: { deletedAt: null, inventory: { some: { branchId, archivedAt: null } } } }] },
       include: {
         brand: { select: { name: true, branchArchives: { where: { branchId }, select: { id: true } } } },
         inventory: { where: { branchId }, select: { sellingPrice: true, archivedAt: true } },
@@ -311,7 +311,7 @@ export class SalesService {
     if (dto.items?.length) {
       const productIds = [...new Set(dto.items.map((i) => i.productId))];
       const products = await this.prisma.product.findMany({
-        where: { id: { in: productIds }, deletedAt: null, brand: { deletedAt: null } },
+        where: { id: { in: productIds }, variantType: 'NONE', deletedAt: null, brand: { deletedAt: null }, OR: [{ parentId: null }, { parent: { deletedAt: null, inventory: { some: { branchId: sale.branchId, archivedAt: null } } } }] },
         include: {
           brand: { select: { name: true, branchArchives: { where: { branchId: sale.branchId }, select: { id: true } } } },
           inventory: { where: { branchId: sale.branchId }, select: { sellingPrice: true, archivedAt: true } },

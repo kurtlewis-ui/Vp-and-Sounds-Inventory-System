@@ -18,7 +18,7 @@ describe('ProductsService — stock safety', () => {
 
   beforeEach(async () => {
     const mockPrisma = {
-      product: { findMany: jest.fn(), update: jest.fn(), aggregate: jest.fn() },
+      product: { findUnique: jest.fn(async () => ({ deletedAt: null, variantType: 'NONE', parent: null })), findMany: jest.fn(), update: jest.fn(), aggregate: jest.fn() },
       branch: { findMany: jest.fn() },
       inventory: {
         findMany: jest.fn(),
@@ -141,6 +141,12 @@ describe('ProductsService — stock safety', () => {
 
   // ---- undoStockMovements --------------------------------------------------
   describe('undoStockMovements', () => {
+    it('prevents undo from reintroducing stock into an archived option', async () => {
+      prisma.stockMovement.findUnique.mockResolvedValue({ id: 'm1', type: 'ADJUSTMENT', productId: 'option', branchId: 'b1', quantityChange: -5 });
+      prisma.product.findUnique.mockResolvedValue({ deletedAt: new Date(), variantType: 'NONE', parent: null });
+      await expect(service.undoStockMovements(['m1'], USER)).rejects.toThrow(/restore the product or option/i);
+      expect(prisma.inventory.upsert).not.toHaveBeenCalled();
+    });
     it('refuses to undo a SALE movement (only restock/adjustment allowed)', async () => {
       prisma.stockMovement.findUnique.mockResolvedValue({
         id: 'm1', type: 'SALE', productId: 'p1', branchId: 'b1', quantityChange: -2, description: 'Added orders.',

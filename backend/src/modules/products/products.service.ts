@@ -12,6 +12,7 @@ import { ImportProductRowDto } from './dto/import-products.dto';
 import { RestockItemDto } from './dto/restock.dto';
 import { slugify } from '../../common/utils/string.util';
 // (UndoStockDto is validated at the controller; the service takes the id list.)
+import { saveProductOptions } from './product-options';
 import { UploadService } from '../../common/upload/upload.service';
 
 @Injectable()
@@ -22,6 +23,12 @@ export class ProductsService {
   ) {}
 
   async create(dto: CreateProductDto, createdBy: string, role?: string) {
+    if (dto.variantType && dto.variantType !== 'NONE') {
+      const image = await this.upload.uploadDataUrl(dto.image?.trim() || null, 'products');
+      const id = await saveProductOptions(this.prisma, { ...dto, image: image ?? undefined }, createdBy);
+      return this.findOne(id, role);
+    }
+    if (dto.options?.length) throw new BadRequestException('Choose flavors or colors before adding options.');
     const brand = await this.prisma.brand.findFirst({
       where: { id: dto.brandId, deletedAt: null },
     });
@@ -136,9 +143,9 @@ export class ProductsService {
 
     // Hide archived products AND products whose brand is archived, so an
     // archived brand's items disappear from every list/dropdown/selling screen.
-    const where: any = { deletedAt: null, brand: { deletedAt: null } };
+    const where: any = { parentId: null, deletedAt: null, brand: { deletedAt: null } };
     if (search) {
-      where.name = { contains: search, mode: 'insensitive' };
+      where.OR = [{ name: { contains: search, mode: 'insensitive' } }, { options: { some: { optionName: { contains: search, mode: 'insensitive' }, deletedAt: null } } }];
     }
     if (brandId) {
       where.brandId = brandId;
@@ -191,7 +198,7 @@ export class ProductsService {
     const { page = 1, limit = 20, search } = query;
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: { not: null } };
+    const where: any = { parentId: null, deletedAt: { not: null } };
     if (search) {
       where.name = { contains: search, mode: 'insensitive' };
     }
@@ -233,6 +240,13 @@ export class ProductsService {
       throw new NotFoundException('Product not found');
     }
 
+    if (current.parentId) throw new BadRequestException('Edit this flavor/color from its parent product.');
+    if (role !== 'Admin' && (current.variantType !== 'NONE' || (dto.variantType && dto.variantType !== 'NONE'))) {
+      const image = dto.image === undefined ? undefined : await this.upload.uploadDataUrl(dto.image?.trim() || null, 'products');
+      await saveProductOptions(this.prisma, { ...dto, ...(image !== undefined ? { image: image ?? '' } : {}) }, updatedBy, id);
+      return { ...await this.findOne(id, role), undoMovementIds: [] };
+    }
+    if (dto.options?.length) throw new BadRequestException('Choose flavors or colors before adding options.');
     // Admin may ONLY change the product image. We short-circuit here so an
     // Admin request can never touch name, brand, selling price, cost price,
     // low-stock alert, OR per-branch quantities — regardless of what the
@@ -372,6 +386,8 @@ export class ProductsService {
   }
 
   async remove(id: string, deletedBy: string) {
+    const sku = await this.prisma.product.findUnique({ where: { id: id }, select: { parentId: true } });
+    if (sku?.parentId) throw new BadRequestException('Manage option archives through Edit Product (Owner only).');
     const product = await this.prisma.product.findFirst({
       where: { id, deletedAt: null },
     });
@@ -402,6 +418,8 @@ export class ProductsService {
    * other branch. Owner + Admin may do this.
    */
   async removeFromBranch(productId: string, branchId: string, actorId: string) {
+    const sku = await this.prisma.product.findUnique({ where: { id: productId }, select: { parentId: true } });
+    if (sku?.parentId) throw new BadRequestException('Manage option archives through Edit Product (Owner only).');
     const product = await this.prisma.product.findFirst({
       where: { id: productId, deletedAt: null },
       select: { id: true, name: true },
@@ -454,6 +472,8 @@ export class ProductsService {
    * becomes visible/sellable again at that branch.
    */
   async restoreToBranch(productId: string, branchId: string, actorId: string) {
+    const sku = await this.prisma.product.findUnique({ where: { id: productId }, select: { parentId: true } });
+    if (sku?.parentId) throw new BadRequestException('Manage option archives through Edit Product (Owner only).');
     const inv = await this.prisma.inventory.findUnique({
       where: { productId_branchId: { productId, branchId } },
       include: {
@@ -488,6 +508,8 @@ export class ProductsService {
   }
 
   async restore(id: string, restoredBy: string, role?: string) {
+    const sku = await this.prisma.product.findUnique({ where: { id: id }, select: { parentId: true } });
+    if (sku?.parentId) throw new BadRequestException('Manage option archives through Edit Product (Owner only).');
     const product = await this.prisma.product.findFirst({
       where: { id, deletedAt: { not: null } },
       include: { brand: true },
@@ -519,6 +541,15 @@ export class ProductsService {
    * matched to existing shops by name (unknown shop names are reported).
    */
   async importProducts(rows: ImportProductRowDto[], userId: string) {
+    // Generic catalog imports cannot change option stock or independently price an option.
+    const optionProducts = await this.prisma.product.findMany({
+      where: { OR: [{ parentId: { not: null } }, { variantType: { not: 'NONE' } }] },
+      select: { name: true },
+    });
+    const protectedNames = new Set(optionProducts.map(p => p.name.trim().toLowerCase()));
+    if (rows.some(r => protectedNames.has(r.name.trim().toLowerCase()))) {
+      throw new BadRequestException('Use Edit Product to manage flavors/colors, or the Restock template to add option stock. This catalog import was not applied.');
+    }
     const branches = await this.prisma.branch.findMany({
       where: { deletedAt: null },
       select: { id: true, name: true },
@@ -663,8 +694,8 @@ export class ProductsService {
 
     // Products: only active products whose brand isn't archived can be restocked.
     const products = await this.prisma.product.findMany({
-      where: { deletedAt: null, brand: { deletedAt: null } },
-      select: { id: true, name: true },
+      where: { deletedAt: null, variantType: 'NONE', brand: { deletedAt: null }, OR: [{ parentId: null }, { parent: { deletedAt: null } }] },
+      select: { id: true, name: true, parentId: true, parent: { select: { inventory: { select: { branchId: true, archivedAt: true } } } } },
     });
     const productById = new Map(products.map((p) => [p.id, p]));
     const productByName = new Map(products.map((p) => [p.name.trim().toLowerCase(), p]));
@@ -701,6 +732,15 @@ export class ProductsService {
           : undefined;
       if (!branch) {
         warnings.push(`Row ${index + 1}: shop not found (${item.branchName ?? item.branchId})`);
+        continue;
+      }
+      if (product.parentId && !product.parent?.inventory.some(i => i.branchId === branch.id && !i.archivedAt)) {
+        warnings.push(`Row ${index + 1}: configure this product at ${branch.name} in Edit Product before restocking.`);
+        continue;
+      }
+      const matchingNames = products.filter(p => p.name.trim().toLowerCase() === product.name.trim().toLowerCase());
+      if (!item.productId && matchingNames.length > 1) {
+        warnings.push(`Row ${index + 1}: ambiguous product name; use its product ID.`);
         continue;
       }
       const key = qtyKey(product.id, branch.id);
@@ -880,6 +920,10 @@ export class ProductsService {
         skipped.push({ id, reason: 'Only restock or quantity-edit movements can be undone.' });
         continue;
       }
+      if (movement.description?.startsWith('Allocated')) {
+        skipped.push({ id, reason: 'Stock allocation cannot be undone independently. Adjust the individual options instead.' });
+        continue;
+      }
       // An undo we previously wrote is tagged in its description; never undo an undo.
       if (movement.description && movement.description.startsWith('Undo:')) {
         skipped.push({ id, reason: 'This entry is itself an undo.' });
@@ -888,6 +932,13 @@ export class ProductsService {
 
       try {
         await this.prisma.$transaction(async (tx) => {
+          const product = await tx.product.findUnique({
+            where: { id: movement.productId },
+            select: { deletedAt: true, variantType: true, parent: { select: { deletedAt: true } } },
+          });
+          if (!product || product.deletedAt || product.parent?.deletedAt || product.variantType !== 'NONE') {
+            throw new BadRequestException('Restore the product or option before changing its stock.');
+          }
           // Re-read INSIDE the transaction and confirm this is still the most
           // recent movement for the product+branch. If anything newer exists
           // (a sale, another restock, or an undo we already applied), refuse.
@@ -964,8 +1015,15 @@ export class ProductsService {
     }
   }
 
+  private optionInclude(branchId?: string) {
+    return { brand: { select: { id: true, name: true, slug: true } }, inventory: {
+      where: branchId ? { branchId } : undefined, include: { branch: { select: { id: true, name: true } } },
+    } };
+  }
+
   private includeFull(branchId?: string) {
     return {
+      options: { include: this.optionInclude(branchId), orderBy: { createdAt: 'asc' as const } },
       brand: { select: { id: true, name: true, slug: true } },
       inventory: {
         where: branchId ? { branchId } : undefined,
@@ -985,6 +1043,8 @@ export class ProductsService {
    */
   private selectFull(branchId?: string): Prisma.ProductSelect {
     return {
+      variantType: true, parentId: true, optionName: true,
+      options: { include: this.optionInclude(branchId), orderBy: { createdAt: 'asc' } },
       id: true,
       name: true,
       slug: true,
@@ -1013,10 +1073,16 @@ export class ProductsService {
 
   private serialize(product: any, includeOwnerFields = false) {
     const defaultPrice = Number(product.sellingPrice);
+    const options = (product.options ?? []).map((o: any) => this.serialize({ ...o, sellingPrice: product.sellingPrice, costPrice: product.costPrice,
+      image: product.image, inventory: (o.inventory ?? []).map((inv: any) => ({ ...inv,
+        sellingPrice: product.inventory?.find((p: any) => p.branchId === inv.branchId)?.sellingPrice ?? product.sellingPrice,
+      })) }, includeOwnerFields));
     const quantities = (product.inventory ?? []).map((inv: any) => ({
       branchId: inv.branchId,
       branchName: inv.branch?.name ?? null,
-      quantity: inv.quantity,
+      quantity: product.variantType && product.variantType !== 'NONE'
+        ? options.filter((o: any) => !o.deletedAt).reduce((sum: number, o: any) => sum + (o.quantities.find((q: any) => q.branchId === inv.branchId)?.quantity ?? 0), 0)
+        : inv.quantity,
       // If branch has its own price use it; otherwise show product's default
       sellingPrice: inv.sellingPrice != null ? Number(inv.sellingPrice) : defaultPrice,
       // Per-branch archive marker: when set, the product is removed from THIS
@@ -1037,6 +1103,7 @@ export class ProductsService {
 
     const result: any = {
       id: product.id,
+      variantType: product.variantType ?? 'NONE', parentId: product.parentId ?? null, optionName: product.optionName ?? null, options,
       name: product.name,
       slug: product.slug,
       image: product.image,
