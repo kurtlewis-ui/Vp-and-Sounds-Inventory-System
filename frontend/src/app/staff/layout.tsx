@@ -263,7 +263,7 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
       <div className={`relative z-10 flex-1 md:ml-[220px] content-transition ${contentTheme === 'light' ? 'content-light' : ''}`}>
         {/* Background transparent (not bg-page-bg) so the brand wallpaper shows
             through; the root canvas still paints the base page color. */}
-        <main className="px-4 py-6 pt-20 sm:px-6 md:pt-6 lg:px-8 max-w-[1200px] xl:max-w-[1440px] mx-auto min-h-screen">{children}</main>
+        <main className="px-4 pb-28 pt-20 sm:px-6 md:pt-6 lg:px-8 max-w-[1200px] xl:max-w-[1440px] mx-auto min-h-screen">{children}</main>
       </div>
 
       <DraftBag />

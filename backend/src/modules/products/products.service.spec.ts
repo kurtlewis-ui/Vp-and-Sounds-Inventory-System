@@ -244,6 +244,16 @@ describe('ProductsService — core & per-branch archive', () => {
 
   // ---- cost-price confidentiality -----------------------------------------
   describe('findAll — cost confidentiality', () => {
+    it('uses a unique tie-breaker when paging equally ordered products', async () => {
+      prisma.product.count.mockResolvedValue(0);
+      prisma.product.findMany.mockResolvedValue([]);
+      await service.findAll({ page: 2, limit: 200 } as any, 'Staff');
+      expect(prisma.product.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        skip: 200, take: 200,
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      }));
+    });
+
     it('includes costPrice for an Owner', async () => {
       prisma.product.count.mockResolvedValue(1);
       prisma.product.findMany.mockResolvedValue([productRow({ costPrice: 40 })]);
