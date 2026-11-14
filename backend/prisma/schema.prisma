@@ -205,6 +205,11 @@ model BranchBrandArchive {
 }
 
 model Product {
+  variantType   String    @default("NONE") @map("variant_type") @db.VarChar(10)
+  parentId      String?   @map("parent_id") @db.Uuid
+  optionName    String?   @map("option_name") @db.VarChar(60)
+  parent        Product?  @relation("ProductOptions", fields: [parentId], references: [id], onDelete: Restrict)
+  options       Product[] @relation("ProductOptions")
   id            String    @id @default(uuid()) @db.Uuid
   name          String    @db.VarChar(150)
   slug          String    @db.VarChar(170)
@@ -233,6 +238,8 @@ model Product {
   stockMovements StockMovement[]
 
   @@index([brandId])
+  @@index([parentId])
+  @@unique([parentId, optionName])
   @@index([deletedAt])
   @@index([sortOrder])
   @@map("products")
