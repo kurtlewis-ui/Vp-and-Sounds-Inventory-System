@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2, Undo2 } from 'lucide-react';
-import { useStockMovements, useUndoStock } from '@/lib/hooks';
+import { useStockMovements, useUndoStock, useProductDetail } from '@/lib/hooks';
 import { useToast } from '@/components/Toast';
 import { getApiErrorMessage } from '@/lib/api';
 import type { StockMovementType } from '@/lib/types';
@@ -37,18 +37,21 @@ interface Props {
 // Which movement types an owner may undo from the history.
 function isUndoable(m: { type: StockMovementType; description?: string | null }): boolean {
   if (m.type !== 'RESTOCK' && m.type !== 'ADJUSTMENT') return false;
+  if (m.description?.startsWith('Allocated')) return false;
   // A compensating "Undo:" entry is not itself undoable.
   if (m.description && m.description.startsWith('Undo:')) return false;
   return true;
 }
 
 export function StockHistoryModal({ productId, productName, branchId, branchName, isOwner, onClose }: Props) {
+  const { data: product } = useProductDetail(productId);
+  const [optionId, setOptionId] = useState('');
   const [page, setPage] = useState(1);
   const toast = useToast();
   const undoStock = useUndoStock();
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const { data, isLoading } = useStockMovements({ productId, branchId, page, limit: 50 });
+  const { data, isLoading } = useStockMovements({ productId: optionId || productId, branchId, page, limit: 50 });
   const movements = Array.isArray(data?.data) ? data.data : [];
   const pagination = data?.pagination;
 
@@ -82,6 +85,12 @@ export function StockHistoryModal({ productId, productName, branchId, branchName
           <button onClick={onClose} className="shrink-0 text-text-muted hover:text-text-primary transition"><X size={20} /></button>
         </div>
 
+        {!!product?.options?.length && <label className="p-3 text-sm">Stock history for
+          <select aria-label="Stock history option" className="w-full bg-input-bg border border-input-border rounded p-2" value={optionId} onChange={e => { setOptionId(e.target.value); setPage(1); }}>
+            <option value="">Original product / conversion history</option>
+            {product.options.map(o => <option key={o.id} value={o.id}>{o.optionName}{o.deletedAt ? ' (Archived)' : ''}</option>)}
+          </select>
+        </label>}
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
           {isLoading ? (

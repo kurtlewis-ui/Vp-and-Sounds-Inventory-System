@@ -3,6 +3,7 @@
  * disposals, expenses, and inventory. Admin-only feature.
  * Uses pagination to fetch ALL records regardless of backend limit.
  */
+import { sellableProducts } from './product-options';
 import * as XLSX from 'xlsx-js-style';
 import { styleHeaderRow } from './xlsx-utils';
 import { api } from './api';
@@ -63,7 +64,7 @@ export async function exportAllData(
   const expenses = await fetchAllPages('/expenses', {}, (p, t) => onProgress?.(`Fetching expenses... page ${p}/${t}`));
 
   onProgress?.('Fetching products...');
-  const products = await fetchAllPages('/products', {}, (p, t) => onProgress?.(`Fetching products... page ${p}/${t}`));
+  const products = sellableProducts(await fetchAllPages('/products', {}, (p, t) => onProgress?.(`Fetching products... page ${p}/${t}`)));
 
   onProgress?.('Generating file...');
 
