@@ -1,10 +1,15 @@
 "use client";
 
+import { useState } from "react";
+import { Select } from "./Select";
+import { OptionArchiveAction } from "./OptionArchiveAction";
+
 export type VariantType = "NONE" | "FLAVOR" | "COLOR";
 export interface OptionFormRow {
   id?: string;
   name: string;
   archived?: boolean;
+  branchArchived?: Record<string, boolean>;
   quantities: Record<string, string>;
 }
 export interface ProductOptionsFieldsProps {
@@ -12,11 +17,55 @@ export interface ProductOptionsFieldsProps {
   setVariantType: (value: VariantType) => void;
   optionRows: OptionFormRow[];
   setOptionRows: (rows: OptionFormRow[]) => void;
-  branchPrices: Record<string, string>;
-  setBranchPrices: (prices: Record<string, string>) => void;
+  stockBranchId: string;
+  setStockBranchId: (id: string) => void;
   originalType?: VariantType;
   allocation?: Record<string, number>;
-  singleBranch?: boolean;
+  productName?: string;
+  beforeArchive?: (row: OptionFormRow, branchId?: string) => void;
+  onArchiveCompleted?: (
+    id: string,
+    branchId: string | undefined,
+    restore: boolean,
+  ) => void;
+}
+
+export function StockBranchPicker({
+  branches,
+  value,
+  onChange,
+}: {
+  branches: { id: string; name: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  if (branches.length <= 1) return null;
+  const matches = branches.filter(
+    (b) =>
+      b.id === value || b.name.toLowerCase().includes(search.toLowerCase()),
+  );
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium">Stock at branch</label>
+      <input
+        aria-label="Search stock branches"
+        type="search"
+        onInput={(e) => e.stopPropagation()}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search branches…"
+        className="min-w-0 w-full rounded-lg border border-input-border bg-input-bg px-3 py-2.5 text-sm"
+      />
+      <Select
+        ariaLabel="Stock branch"
+        value={value}
+        onChange={onChange}
+        className="w-full"
+        options={matches.map((b) => ({ value: b.id, label: b.name }))}
+      />
+    </div>
+  );
 }
 
 export function ProductOptionsFields({
@@ -24,17 +73,21 @@ export function ProductOptionsFields({
   setVariantType,
   optionRows,
   setOptionRows,
-  branchPrices,
-  setBranchPrices,
+  stockBranchId,
+  setStockBranchId,
   originalType,
   allocation,
-  singleBranch,
+  productName,
+  beforeArchive,
+  onArchiveCompleted,
   branches,
   onDirty,
 }: ProductOptionsFieldsProps & {
   branches: { id: string; name: string }[];
   onDirty: () => void;
 }) {
+  const branch = branches.find((b) => b.id === stockBranchId) ?? branches[0];
+  const branchId = branch?.id ?? "";
   const update = (index: number, patch: Partial<OptionFormRow>) => {
     onDirty();
     setOptionRows(
@@ -42,12 +95,21 @@ export function ProductOptionsFields({
     );
   };
   const inputClass =
-    "w-full rounded border border-input-border bg-input-bg px-3 py-2 text-sm";
+    "w-full rounded-lg border border-input-border bg-input-bg px-3 py-2.5 text-sm";
+  const total = optionRows
+    .filter((r) => !r.archived && !r.branchArchived?.[branchId])
+    .reduce((sum, row) => sum + (Number(row.quantities[branchId]) || 0), 0);
   return (
-    <section className="space-y-3">
-      <label className="block text-sm font-medium">
-        Product type
+    <section className="space-y-6">
+      <div className="space-y-3">
+        <label
+          htmlFor="product-option-type"
+          className="block text-sm font-medium"
+        >
+          Product type
+        </label>
         <select
+          id="product-option-type"
           aria-label="Product type"
           value={variantType}
           disabled={!!originalType && originalType !== "NONE"}
@@ -61,151 +123,144 @@ export function ProductOptionsFields({
           <option value="FLAVOR">With flavors</option>
           <option value="COLOR">With colors</option>
         </select>
-      </label>
+        {variantType !== "NONE" && (
+          <p className="text-xs leading-relaxed text-text-muted">
+            Each {variantType === "FLAVOR" ? "flavor" : "color"} has its own
+            stock and shares the product's selling price.
+          </p>
+        )}
+      </div>
       {variantType !== "NONE" && (
         <>
-          <p className="text-xs text-text-muted">
-            Each {variantType === "FLAVOR" ? "flavor" : "color"} has its own
-            stock. All options share the product price at each shop.
-          </p>
           {allocation && (
-            <p className="rounded border border-accent-orange p-3 text-sm">
-              Distribute all existing stock below without changing the totals.
-              Finish or clear pending sales, disposals and drafts before
-              converting.
+            <p className="rounded-lg border border-accent-orange p-3 text-sm">
+              Distribute the existing stock at every branch. Its total must
+              match before conversion.
             </p>
           )}
+          <StockBranchPicker
+            branches={branches}
+            value={branchId}
+            onChange={setStockBranchId}
+          />
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full table-fixed text-sm">
               <thead>
                 <tr>
-                  <th className="text-left p-2">
+                  <th className="w-[38%] p-2 text-left">
                     {variantType === "FLAVOR" ? "Flavor" : "Color"}
                   </th>
-                  {branches.map((b) => (
-                    <th key={b.id} className="p-2 min-w-[110px]">
-                      {singleBranch ? 'Quantity' : b.name}
-                    </th>
-                  ))}
-                  <th className="p-2">Status</th>
+                  <th className="w-[38%] p-2 text-left">Quantity</th>
+                  <th className="w-[24%] p-2 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {optionRows.map((row, i) => (
-                  <tr key={row.id ?? i}>
-                    <td className="p-1 min-w-[140px]">
-                      <input
-                        aria-label={`Option ${i + 1} name`}
-                        maxLength={60}
-                        value={row.name}
-                        disabled={!!row.id}
-                        onChange={(e) => update(i, { name: e.target.value })}
-                        className={inputClass}
-                        placeholder={
-                          variantType === "FLAVOR" ? "Mango" : "Black"
-                        }
-                      />
-                    </td>
-                    {branches.map((b) => (
-                      <td key={b.id} className="p-1">
+                {optionRows.map((row, i) => {
+                  const archivedHere =
+                    !!row.archived || !!row.branchArchived?.[branchId];
+                  return (
+                    <tr key={row.id ?? i}>
+                      <td className="p-1 align-middle">
+                        <input
+                          aria-label={`Option ${i + 1} name`}
+                          maxLength={60}
+                          value={row.name}
+                          disabled={!!row.id}
+                          onChange={(e) => update(i, { name: e.target.value })}
+                          className={inputClass}
+                          placeholder={
+                            variantType === "FLAVOR" ? "Mango" : "Black"
+                          }
+                        />
+                        {archivedHere && (
+                          <span className="text-xs text-text-muted">
+                            {row.archived
+                              ? "Archived globally"
+                              : "Archived at this branch"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-1 align-middle">
                         <input
                           type="number"
                           min="0"
                           step="1"
-                          aria-label={`${row.name || "Option"} stock at ${b.name}`}
-                          value={row.quantities[b.id] ?? ""}
-                          disabled={row.archived}
+                          aria-label={`${row.name || "Option"} stock at ${branch?.name ?? "shop"}`}
+                          value={row.quantities[branchId] ?? ""}
+                          disabled={archivedHere || !branchId}
                           placeholder="0"
                           className={inputClass}
                           onChange={(e) =>
                             update(i, {
                               quantities: {
                                 ...row.quantities,
-                                [b.id]: e.target.value,
+                                [branchId]: e.target.value,
                               },
                             })
                           }
                         />
                       </td>
-                    ))}
-                    <td className="p-1">
-                      {row.id ? (
-                        <label className="text-xs whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={!!row.archived}
-                            onChange={(e) =>
-                              update(i, { archived: e.target.checked })
-                            }
-                          />{" "}
-                          Archived
-                        </label>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onDirty();
-                            setOptionRows(optionRows.filter((_, n) => n !== i));
-                          }}
-                          className="text-accent-red"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                <tr>
-                  <th className="p-2 text-left">Total stock</th>
-                  {branches.map((b) => {
-                    const total = optionRows
-                      .filter((r) => !r.archived)
-                      .reduce(
-                        (n, r) => n + (Number(r.quantities[b.id]) || 0),
-                        0,
-                      );
-                    return (
-                      <td key={b.id} className="p-2 font-bold">
-                        {total}
-                        {allocation && (
-                          <span
-                            className={
-                              total === (allocation[b.id] ?? 0)
-                                ? "text-accent-green"
-                                : "text-accent-red"
-                            }
+                      <td className="p-1 align-middle">
+                        {row.id ? (
+                          <div className="flex items-center gap-1">
+                            {!!branchId && (
+                              <OptionArchiveAction
+                                id={row.id}
+                                name={`${productName ?? ""} — ${row.name}`}
+                                branchId={branchId}
+                                branchName={branch?.name}
+                                archived={!!row.branchArchived?.[branchId]}
+                                globallyArchived={row.archived}
+                                beforeAction={() =>
+                                  beforeArchive?.(row, branchId)
+                                }
+                                onCompleted={(restore) =>
+                                  onArchiveCompleted?.(
+                                    row.id!,
+                                    branchId,
+                                    restore,
+                                  )
+                                }
+                              />
+                            )}
+                            <OptionArchiveAction
+                              id={row.id}
+                              name={`${productName ?? ""} — ${row.name}`}
+                              archived={!!row.archived}
+                              beforeAction={() => beforeArchive?.(row)}
+                              onCompleted={(restore) =>
+                                onArchiveCompleted?.(
+                                  row.id!,
+                                  undefined,
+                                  restore,
+                                )
+                              }
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDirty();
+                              setOptionRows(
+                                optionRows.filter((_, index) => index !== i),
+                              );
+                            }}
+                            className="p-2 text-accent-red"
                           >
-                            {" "}
-                            / {allocation[b.id] ?? 0}
-                          </span>
+                            Remove
+                          </button>
                         )}
                       </td>
-                    );
-                  })}
-                  <td />
-                </tr>
+                    </tr>
+                  );
+                })}
                 <tr>
-                  <th className="p-2 text-left">Shop price (₱)</th>
-                  {branches.map((b) => (
-                    <td key={b.id} className="p-1">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        aria-label={`Price at ${b.name}`}
-                        value={branchPrices[b.id] ?? ""}
-                        placeholder="Default price"
-                        className={inputClass}
-                        onChange={(e) => {
-                          onDirty();
-                          setBranchPrices({
-                            ...branchPrices,
-                            [b.id]: e.target.value,
-                          });
-                        }}
-                      />
-                    </td>
-                  ))}
+                  <th className="p-2 text-left">Available stock</th>
+                  <td className="p-2 font-bold">
+                    {total}
+                    {allocation && ` / ${allocation[branchId] ?? 0}`}
+                  </td>
                   <td />
                 </tr>
               </tbody>
@@ -217,14 +272,10 @@ export function ProductOptionsFields({
               onDirty();
               setOptionRows([...optionRows, { name: "", quantities: {} }]);
             }}
-            className="btn-secondary rounded px-3 py-2 text-sm"
+            className="btn-secondary rounded-lg px-3 py-2 text-sm"
           >
             + Add {variantType === "FLAVOR" ? "flavor" : "color"}
           </button>
-          <p className="text-xs text-text-muted">
-            Existing option names are kept for traceability. Archive an option
-            only after its stock and pending work are cleared.
-          </p>
         </>
       )}
     </section>

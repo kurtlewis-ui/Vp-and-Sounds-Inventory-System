@@ -65,6 +65,19 @@ describe('ProductsService — core & per-branch archive', () => {
     prisma = module.get(PrismaService);
   });
 
+  it('applies an All Shops price to ordinary products without overwriting a newer stock count', async () => {
+    prisma.product.findFirst.mockResolvedValue(productRow({ variantType: 'NONE', parentId: null }));
+    prisma.product.findUnique.mockResolvedValue(productRow());
+    prisma.branch.count.mockResolvedValue(1);
+    prisma.inventory.findMany = jest.fn().mockResolvedValue([{ branchId: BRANCH_ID, quantity: 9 }]);
+    prisma.inventory.updateMany = jest.fn();
+    await service.update(PRODUCT_ID, { sellingPrice: 700, applyPriceToAllBranches: true,
+      quantities: [{ branchId: BRANCH_ID, quantity: 10, expectedQuantity: 10, sellingPrice: 700 }] }, USER, 'Owner');
+    expect(prisma.inventory.upsert.mock.calls[0][0].update).toEqual({});
+    expect(prisma.inventory.updateMany).toHaveBeenCalledWith({ where: { productId: PRODUCT_ID }, data: { sellingPrice: 700 } });
+    expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+  });
+
   // ---- create --------------------------------------------------------------
   describe('create', () => {
     it('rejects when the brand does not exist', async () => {

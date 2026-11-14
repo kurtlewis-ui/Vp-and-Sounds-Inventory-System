@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { OptionArchiveDto, QueryOptionArchiveDto } from './dto/option-archive.dto';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -93,6 +94,24 @@ export class ProductsController {
   async findArchived(@Query() query: QueryProductDto, @CurrentUser() user: RequestUser) {
     const result = await this.productsService.findArchived(query, user.role);
     return { success: true, data: result.data, pagination: result.pagination };
+  }
+
+  @Get('option-archives')
+  @Roles('Owner')
+  async optionArchives(@Query() query: QueryOptionArchiveDto) {
+    return { success: true, ...await this.productsService.optionArchives(query) };
+  }
+
+  @Post('options/:id/archive')
+  @Roles('Owner')
+  async archiveOption(@Param('id', ParseUUIDPipe) id: string, @Body() dto: OptionArchiveDto, @CurrentUser() user: RequestUser) {
+    return { success: true, data: await this.productsService.archiveOption(id, user.userId, false, dto.branchId) };
+  }
+
+  @Post('options/:id/restore')
+  @Roles('Owner')
+  async restoreOption(@Param('id', ParseUUIDPipe) id: string, @Body() dto: OptionArchiveDto, @CurrentUser() user: RequestUser) {
+    return { success: true, data: await this.productsService.archiveOption(id, user.userId, true, dto.branchId) };
   }
 
   @Get(':id')

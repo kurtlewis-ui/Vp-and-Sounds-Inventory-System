@@ -113,7 +113,7 @@ export default function StaffProductsPage() {
                         <div className="flex h-10 w-10 items-center justify-center rounded bg-white/10 text-[9px] text-text-muted">No Img</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-text-primary">{p.name}{!!p.options?.length && <span className="block text-xs text-text-muted">{p.options.filter(o => !o.deletedAt).map(o => `${o.optionName}: ${o.totalQuantity}`).join(' · ')}</span>}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-text-primary">{p.name}{!!p.options?.length && <span className="block text-xs text-text-muted">{p.options.filter(o => !o.deletedAt && o.quantities.some(q => !q.archivedAt)).map(o => `${o.optionName}: ${o.totalQuantity}`).join(' · ')}</span>}</td>
                     <td className={`px-4 py-3 text-sm ${p.totalQuantity <= 0 ? 'text-accent-red font-medium' : p.totalQuantity <= (p.quantityAlert || 5) ? 'text-accent-orange font-medium' : 'text-text-primary'}`}>
                       {p.totalQuantity}
                       {p.totalQuantity <= 0 && <span className="ml-1 text-[10px]">(Out)</span>}
@@ -149,7 +149,7 @@ export default function StaffProductsPage() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-text-primary break-words">
-                        <span className="text-accent-blue mr-1.5">{startIndex + i}.</span>{p.name}{!!p.options?.length && <span className="block text-xs text-text-muted">{p.options.filter(o => !o.deletedAt).map(o => `${o.optionName}: ${o.totalQuantity}`).join(' · ')}</span>}
+                        <span className="text-accent-blue mr-1.5">{startIndex + i}.</span>{p.name}{!!p.options?.length && <span className="block text-xs text-text-muted">{p.options.filter(o => !o.deletedAt && o.quantities.some(q => !q.archivedAt)).map(o => `${o.optionName}: ${o.totalQuantity}`).join(' · ')}</span>}
                       </p>
                       <p className="text-xs text-text-secondary">{p.brand?.name ?? '—'} · {peso(p.sellingPrice)}</p>
                     </div>

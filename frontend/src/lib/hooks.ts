@@ -1,5 +1,7 @@
 'use client';
 
+import { useAuthStore } from './store';
+
 import {
   useMutation,
   useQuery,
@@ -348,6 +350,7 @@ export function useRestoreBrandToBranch() {
 // PRODUCTS
 // ===========================================================================
 export interface ProductMutationInput {
+  applyPriceToAllBranches?: boolean;
   variantType?: 'NONE' | 'FLAVOR' | 'COLOR';
   options?: { id?: string; name: string; archived?: boolean; quantities?: { branchId: string; quantity: number }[] }[];
   name: string;
@@ -1329,5 +1332,29 @@ export function useStockMovements(params?: { productId?: string; branchId?: stri
       };
     },
     enabled: !!params?.productId,
+  });
+}
+
+export interface OptionArchiveEntry {
+  id: string;
+  name: string;
+  product: { id: string; name: string; variantType: string };
+  globallyArchived: boolean;
+  archivedAt: string | null;
+  quantities: { branchId: string; branchName: string; quantity: number; archivedAt: string | null }[];
+}
+
+export function useOptionArchives(params: { scope: 'global' | 'branch'; branchId?: string; search?: string; page: number }) {
+  const owner = useAuthStore(s => s.user?.role?.name === 'Owner');
+  return useQuery({ queryKey: ['option-archives', params], enabled: owner,
+    queryFn: () => getList<OptionArchiveEntry>('/products/option-archives', { ...params, limit: 20 }) });
+}
+
+export function useChangeOptionArchive() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: ({ id, branchId, restore }: { id: string; branchId?: string; restore: boolean }) =>
+      api.post(`/products/options/${id}/${restore ? 'restore' : 'archive'}`, { branchId }).then(r => r.data.data),
+    onSuccess: () => invalidate(['products'], ['product'], ['option-archives'], ['stats'], ['sales'], ['stock-movements']),
   });
 }

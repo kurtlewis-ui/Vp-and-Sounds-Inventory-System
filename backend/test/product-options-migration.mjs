@@ -39,5 +39,18 @@ try {
   const results = await Promise.all([reserve(), reserve()]);
   assert.equal(results.reduce((n, r) => n + r.rows.length, 0), 1, 'only one reservation can consume the last unit');
   assert.equal((await db.query('SELECT quantity FROM inventory WHERE product_id=$1', [product])).rows[0].quantity, 10, 'reserving an option does not touch legacy parent stock');
-  console.log('PASS: all prior migrations, additive option migration, stock preservation, uniqueness, FK/check constraints, rollback, and last-unit reservation.');
+  // Branch and global archives hide stock independently while retaining quantity.
+  await db.query('UPDATE inventory SET quantity=9, archived_at=now() WHERE product_id=$1', [option]);
+  const reserveActive = () => db.query('UPDATE inventory SET quantity=quantity-1 WHERE product_id=$1 AND branch_id=$2 AND quantity>=1 AND archived_at IS NULL AND EXISTS (SELECT 1 FROM products p WHERE p.id=inventory.product_id AND p.deleted_at IS NULL) RETURNING quantity', [option, branch]);
+  assert.equal((await reserveActive()).rows.length, 0);
+  await db.query('UPDATE products SET deleted_at=now() WHERE id=$1', [option]);
+  await db.query('UPDATE products SET deleted_at=NULL WHERE id=$1', [option]);
+  assert.equal((await reserveActive()).rows.length, 0, 'global restore preserves branch archive');
+  assert.equal((await db.query('SELECT quantity FROM inventory WHERE product_id=$1', [option])).rows[0].quantity, 9);
+  await db.query('UPDATE inventory SET archived_at=NULL WHERE product_id=$1', [option]);
+  await db.query('UPDATE products SET deleted_at=now() WHERE id=$1', [option]);
+  assert.equal((await reserveActive()).rows.length, 0, 'global archive blocks reservation');
+  await db.query('UPDATE products SET deleted_at=NULL WHERE id=$1', [option]);
+  assert.equal((await reserveActive()).rows[0].quantity, 8, 'restored stock can be reserved');
+  console.log('PASS: migrations, stock preservation, constraints, rollback, last-unit reservation, independent archive scopes, retained quantities, and restored availability.');
 } finally { await db.close(); }

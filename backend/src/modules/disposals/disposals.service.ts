@@ -325,7 +325,7 @@ export class DisposalsService {
     quantity: number,
   ): Promise<number> {
     const result = await tx.inventory.updateMany({
-      where: { productId, branchId, quantity: { gte: quantity } },
+      where: { productId, branchId, archivedAt: null, product: { deletedAt: null }, quantity: { gte: quantity } },
       data: { quantity: { decrement: quantity } },
     });
     if (result.count === 0) {

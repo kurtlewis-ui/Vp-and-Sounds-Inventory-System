@@ -1,6 +1,6 @@
 'use client';
 
-import { ProductOptionsFields, type ProductOptionsFieldsProps, type VariantType, type OptionFormRow } from '@/components/ProductOptionsFields';
+import { ProductOptionsFields, StockBranchPicker, type ProductOptionsFieldsProps, type VariantType, type OptionFormRow } from '@/components/ProductOptionsFields';
 import { sellableProducts } from '@/lib/product-options';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Archive, X, Loader2, Upload, Download, RefreshCw, FileDown, ClipboardList, Trash2, GripVertical, ArrowUpDown, Check, AlertTriangle, ImagePlus, Store } from 'lucide-react';
@@ -188,7 +188,8 @@ export default function ProductsPage() {
 
   const [variantType, setVariantType] = useState<VariantType>('NONE');
   const [optionRows, setOptionRows] = useState<OptionFormRow[]>([]);
-  const [branchPrices, setBranchPrices] = useState<Record<string, string>>({});
+  const [stockBranchId, setStockBranchId] = useState('');
+  const [priceDirty, setPriceDirty] = useState(false);
   const [formName, setFormName] = useState('');
   const [formBrand, setFormBrand] = useState('');
   const [formPrice, setFormPrice] = useState('');
@@ -209,9 +210,10 @@ export default function ProductsPage() {
     if (!formDirty && freshEditProduct.costPrice != null) {
       setFormCostPrice(freshEditProduct.costPrice.toString());
       setEditingProduct(freshEditProduct);
+      const prices = freshEditProduct.quantities.map(q => q.sellingPrice ?? freshEditProduct.sellingPrice);
+      setFormPrice(!shopFilter && new Set(prices).size > 1 ? '' : String(shopFilter ? prices[freshEditProduct.quantities.findIndex(q => q.branchId === shopFilter)] ?? freshEditProduct.sellingPrice : prices[0] ?? freshEditProduct.sellingPrice));
       setVariantType(freshEditProduct.variantType ?? 'NONE');
-      setOptionRows((freshEditProduct.options ?? []).map(o => ({ id: o.id, name: o.optionName ?? '', archived: !!o.deletedAt, quantities: Object.fromEntries(o.quantities.map(q => [q.branchId, String(q.quantity)])) })));
-      setBranchPrices(Object.fromEntries(freshEditProduct.quantities.map(q => [q.branchId, String(q.sellingPrice ?? freshEditProduct.sellingPrice)])));
+      setOptionRows((freshEditProduct.options ?? []).map(o => ({ id: o.id, name: o.optionName ?? '', archived: !!o.deletedAt, branchArchived: Object.fromEntries(o.quantities.map(q => [q.branchId, !!q.archivedAt])), quantities: Object.fromEntries(o.quantities.map(q => [q.branchId, String(q.quantity)])) })));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freshEditProduct, showEditModal]);
@@ -221,7 +223,7 @@ export default function ProductsPage() {
 
   const totalPages = entriesPerPage === 'All' ? 1 : Math.max(1, Math.ceil(products.length / entriesPerPage));
   const displayProducts = entriesPerPage === 'All' ? products : products.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
-  const branchesForForm = useMemo(() => branches, [branches]);
+  const branchesForForm = useMemo(() => shopFilter ? branches.filter(b => b.id === shopFilter) : branches, [branches, shopFilter]);
   // When a specific shop is selected, only show that shop's quantity in the form
   const branchesForEdit = useMemo(() => {
     if (shopFilter) return branches.filter((b) => b.id === shopFilter);
@@ -253,7 +255,8 @@ export default function ProductsPage() {
   }
 
   function openAddModal() {
-    setEditingProduct(null); setVariantType('NONE'); setOptionRows([]); setBranchPrices({});
+    setPriceDirty(false); setStockBranchId(shopFilter || branches[0]?.id || '');
+    setEditingProduct(null); setVariantType('NONE'); setOptionRows([]);
     // Start numeric fields EMPTY so they show a gray "0" placeholder instead of
     // a literal 0 the user must delete before typing. Submit defaults to 0.
     setFormName(''); setFormBrand(brands[0]?.id ?? ''); setFormPrice(''); setFormCostPrice(''); setFormAlert('');
@@ -262,20 +265,20 @@ export default function ProductsPage() {
     setFormQuantities(q); setFormError(null); setFormDirty(false); setShowAddModal(true);
   }
   function openEditModal(product: Product) {
+    setPriceDirty(false); setStockBranchId(shopFilter || branches[0]?.id || '');
     setEditingProduct(product);
     setVariantType(product.variantType ?? 'NONE');
-    setOptionRows((product.options ?? []).map(o => ({ id: o.id, name: o.optionName ?? '', archived: !!o.deletedAt, quantities: Object.fromEntries(o.quantities.map(q => [q.branchId, String(q.quantity)])) })));
-    setBranchPrices(Object.fromEntries(product.quantities.map(q => [q.branchId, String(q.sellingPrice ?? product.sellingPrice)])));
+    setOptionRows((product.options ?? []).map(o => ({ id: o.id, name: o.optionName ?? '', archived: !!o.deletedAt, branchArchived: Object.fromEntries(o.quantities.map(q => [q.branchId, !!q.archivedAt])), quantities: Object.fromEntries(o.quantities.map(q => [q.branchId, String(q.quantity)])) })));
     setFormName(product.name); setFormBrand(product.brand?.id ?? brands[0]?.id ?? '');
     // When a specific shop is selected, prefill THAT branch's own price so
     // saving doesn't overwrite the branch price with the global default.
     // (buildQuantitiesPayload sends formPrice as the branch price in this case.)
     const priceToShow = shopFilter
       ? (product.quantities.find((q) => q.branchId === shopFilter)?.sellingPrice ?? product.sellingPrice)
-      : product.sellingPrice;
+      : (product.quantities[0]?.sellingPrice ?? product.sellingPrice);
     // Prefill the owner-only cost from the product so it shows back after saving
     // and edits don't wipe it. (Non-owners never receive costPrice, so this is empty for them.)
-    setFormPrice(priceToShow.toString()); setFormCostPrice(product.costPrice != null ? product.costPrice.toString() : ''); setFormAlert(product.quantityAlert.toString());
+    setFormPrice(!shopFilter && new Set(product.quantities.map(q => q.sellingPrice ?? product.sellingPrice)).size > 1 ? '' : priceToShow.toString()); setFormCostPrice(product.costPrice != null ? product.costPrice.toString() : ''); setFormAlert(product.quantityAlert.toString());
     setFormImage(product.image ?? null);
     const q: Record<string, string> = {};
     branchesForEdit.forEach((b) => { q[b.id] = (product.quantities.find((x) => x.branchId === b.id)?.quantity ?? 0).toString(); });
@@ -284,36 +287,60 @@ export default function ProductsPage() {
   function optionPayload() {
     if (variantType === 'NONE') return { variantType, options: [] };
     if (!optionRows.length) throw new Error('Add at least one flavor/color.');
-    const names = optionRows.map(r => r.name.trim().toLowerCase());
-    if (names.some(n => !n) || new Set(names).size !== names.length) throw new Error('Enter unique, nonempty flavor/color names.');
-    return { variantType, options: optionRows.map(row => ({ id: row.id, name: row.name.trim(), archived: row.archived,
-      quantities: (showEditModal ? branchesForEdit : branchesForForm).map(b => {
-        const quantity = Number(row.quantities[b.id] || 0);
+    const names = optionRows.map(row => row.name.trim().toLowerCase());
+    if (names.some(name => !name) || new Set(names).size !== names.length) throw new Error('Enter unique flavor/color names.');
+    return { variantType, options: optionRows.map(row => {
+      const previous = editingProduct?.options?.find(o => o.id === row.id);
+      const quantities = Object.entries(row.quantities).flatMap(([branchId, text]) => {
+        if (shopFilter && branchId !== shopFilter) return [];
+        const quantity = Number(text || 0);
         if (!Number.isInteger(quantity) || quantity < 0) throw new Error('Stock must be a whole number, zero or more.');
-        return { branchId: b.id, quantity, expectedQuantity: editingProduct?.options?.find(o => o.id === row.id)?.quantities.find(q => q.branchId === b.id)?.quantity ?? 0 };
-      }),
-    })) };
+        const expectedQuantity = previous?.quantities.find(q => q.branchId === branchId)?.quantity ?? 0;
+        if (previous && quantity === expectedQuantity) return [];
+        return [{ branchId, quantity, expectedQuantity }];
+      });
+      return { id: row.id, name: row.name.trim(), quantities };
+    }) };
   }
 
-  const optionFields: ProductOptionsFieldsProps = { variantType, setVariantType, optionRows, setOptionRows, branchPrices, setBranchPrices,
-    originalType: editingProduct?.variantType ?? 'NONE', singleBranch: showEditModal && !!shopFilter,
-    allocation: editingProduct && (!editingProduct.variantType || editingProduct.variantType === 'NONE') && variantType !== 'NONE'
+  function beforeOptionArchive(row: OptionFormRow, branchId?: string) {
+    const previous = editingProduct?.options?.find(o => o.id === row.id);
+    const changed = Object.entries(row.quantities).some(([id, quantity]) => (!branchId || id === branchId) && Number(quantity || 0) !== (previous?.quantities.find(q => q.branchId === id)?.quantity ?? 0));
+    if (changed) throw new Error('Save this option’s stock edits before archiving or restoring it. Other form edits will stay in place.');
+  }
+
+  function optionArchiveCompleted(id: string, branchId: string | undefined, restore: boolean) {
+    setOptionRows(rows => rows.map(row => row.id !== id ? row : branchId
+      ? { ...row, branchArchived: { ...row.branchArchived, [branchId]: !restore } }
+      : { ...row, archived: !restore }));
+    setEditingProduct(product => product ? { ...product, options: product.options?.map(o => o.id !== id ? o : branchId
+      ? { ...o, quantities: o.quantities.map(q => q.branchId === branchId ? { ...q, archivedAt: restore ? null : new Date().toISOString() } : q) }
+      : { ...o, deletedAt: restore ? null : new Date().toISOString() }) } : product);
+  }
+
+  const optionFields: ProductOptionsFieldsProps = { variantType, setVariantType, optionRows, setOptionRows, stockBranchId, setStockBranchId,
+    productName: formName, beforeArchive: beforeOptionArchive, onArchiveCompleted: optionArchiveCompleted,
+    originalType: editingProduct?.variantType ?? 'NONE',
+    allocation: editingProduct && (editingProduct.variantType ?? 'NONE') === 'NONE' && variantType !== 'NONE'
       ? Object.fromEntries(editingProduct.quantities.map(q => [q.branchId, q.quantity])) : undefined };
 
+  const mixedPrices = !!editingProduct && !shopFilter && new Set(editingProduct.quantities.map(q => q.sellingPrice ?? editingProduct.sellingPrice)).size > 1;
+  const priceScope = shopFilter ? branches.find(b => b.id === shopFilter)?.name ?? 'Selected branch' : 'All Shops';
+
   function buildQuantitiesPayload() {
-    if (variantType !== 'NONE') return (showEditModal ? branchesForEdit : branchesForForm).map(b => {
-      const sellingPrice = Number(branchPrices[b.id]?.trim() || formPrice || 0);
-      if (!Number.isFinite(sellingPrice) || sellingPrice < 0) throw new Error('Enter a valid selling price.');
-      return { branchId: b.id, quantity: 0, sellingPrice };
-    });
-    // Only send quantities for branches shown in the form
     const targetBranches = showEditModal ? branchesForEdit : branchesForForm;
-    return targetBranches.map((b) => ({
-      branchId: b.id,
-      quantity: parseInt(formQuantities[b.id] || '0') || 0,
-      // When editing a specific branch, include the selling price as a branch override
-      ...(shopFilter && showEditModal ? { sellingPrice: parseFloat(formPrice) || 0 } : {}),
-    }));
+    let sellingPrice: number | undefined;
+    if (!showEditModal || priceDirty) {
+      sellingPrice = Number(formPrice || 0);
+      if ((showEditModal && !formPrice.trim()) || !Number.isFinite(sellingPrice) || sellingPrice < 0 || Math.abs(sellingPrice * 100 - Math.round(sellingPrice * 100)) > 0.0001) throw new Error('Enter a valid selling price with up to two decimal places.');
+    }
+    return targetBranches.flatMap<{ branchId: string; quantity: number; expectedQuantity?: number; sellingPrice?: number }>(b => {
+      if (variantType !== 'NONE') return sellingPrice === undefined ? [] : [{ branchId: b.id, quantity: 0, sellingPrice }];
+      const quantity = Number(formQuantities[b.id] || 0);
+      if (!Number.isInteger(quantity) || quantity < 0) throw new Error('Stock must be a whole number, zero or more.');
+      if (showEditModal && sellingPrice === undefined && quantity === (editingProduct?.quantities.find(q => q.branchId === b.id)?.quantity ?? 0)) return [];
+      return [{ branchId: b.id, quantity, expectedQuantity: editingProduct?.quantities.find(q => q.branchId === b.id)?.quantity ?? 0, ...(sellingPrice !== undefined ? { sellingPrice } : {}) }];
+    });
   }
   async function handleAdd() {
     if (!formName.trim()) { setFormError('Product name is required.'); return; }
@@ -338,9 +365,9 @@ export default function ProductsPage() {
       if (formCostPrice.trim() !== '') {
         updateData.costPrice = parseFloat(formCostPrice) || 0;
       }
-      if (!shopFilter) {
-        // All Shops → update the global/default selling price
-        updateData.sellingPrice = parseFloat(formPrice) || 0;
+      if (!shopFilter && priceDirty) {
+        updateData.sellingPrice = Number(formPrice);
+        updateData.applyPriceToAllBranches = true;
       }
       const res = await withScrollPreserved(() => updateProduct.mutateAsync(updateData));
       setFormDirty(false); setEditingProduct(null); setShowEditModal(false);
@@ -501,7 +528,7 @@ export default function ProductsPage() {
                   key={product.id}
                   data-reorder-row={reorderMode ? '' : undefined}
                   data-reorder-id={reorderMode ? product.id : undefined}
-                  className={`border-t border-card-border align-top transition-colors ${reorderMode && dragIndex === i ? 'opacity-50' : ''} ${reorderMode && overIndex === i && dragIndex !== i ? 'bg-accent-green/10' : ''}`}
+                  className={`border-t border-card-border align-middle transition-colors ${reorderMode && dragIndex === i ? 'opacity-50' : ''} ${reorderMode && overIndex === i && dragIndex !== i ? 'bg-accent-green/10' : ''}`}
                 >
                   {reorderMode && (
                     <td className="px-2 py-3 align-middle">
@@ -525,7 +552,7 @@ export default function ProductsPage() {
                       <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center text-[10px] text-text-muted">No Img</div>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-sm text-text-primary font-medium">{product.name}{!isOwner && !!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View {product.variantType === 'FLAVOR' ? 'flavors' : 'colors'}</button>}</td>
+                  <td className="px-3 py-3 align-middle text-sm text-text-primary font-medium">{product.name}{!isOwner && !!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View {product.variantType === 'FLAVOR' ? 'flavors' : 'colors'}</button>}</td>
                   <td className="px-3 py-3 text-sm">
                     {shopFilter ? (
                       (() => {
@@ -729,10 +756,10 @@ export default function ProductsPage() {
       </div>
 
       {showAddModal && (
-        <ProductFormModal optionFields={optionFields} title="Add New Product" onClose={closeAdd} onDirty={() => setFormDirty(true)} onSubmit={handleAdd} error={formError} buttonLabel={createProduct.isPending ? 'Saving...' : 'Save Product'} disabled={createProduct.isPending} formName={formName} setFormName={setFormName} formBrand={formBrand} setFormBrand={setFormBrand} formPrice={formPrice} setFormPrice={setFormPrice} formCostPrice={formCostPrice} setFormCostPrice={setFormCostPrice} isOwner={isOwner} formAlert={formAlert} setFormAlert={setFormAlert} formImage={formImage} setFormImage={setFormImage} isAdmin={isAdmin} formQuantities={formQuantities} setFormQuantities={setFormQuantities} branches={branchesForForm} brands={brands} />
+        <ProductFormModal optionFields={optionFields} title="Add New Product" onClose={closeAdd} onDirty={() => setFormDirty(true)} onSubmit={handleAdd} error={formError} buttonLabel={createProduct.isPending ? 'Saving...' : 'Save Product'} disabled={createProduct.isPending} formName={formName} setFormName={setFormName} formBrand={formBrand} setFormBrand={setFormBrand} priceScope={priceScope} mixedPrices={mixedPrices} formPrice={formPrice} setFormPrice={v => { setPriceDirty(true); setFormPrice(v); }} formCostPrice={formCostPrice} setFormCostPrice={setFormCostPrice} isOwner={isOwner} formAlert={formAlert} setFormAlert={setFormAlert} formImage={formImage} setFormImage={setFormImage} isAdmin={isAdmin} formQuantities={formQuantities} setFormQuantities={setFormQuantities} branches={branchesForForm} brands={brands} />
       )}
       {showEditModal && editingProduct && (
-        <ProductFormModal optionFields={optionFields} title="Edit Product" onClose={closeEdit} onDirty={() => setFormDirty(true)} onSubmit={handleEdit} error={formError} buttonLabel={updateProduct.isPending ? 'Saving...' : 'Update Product'} disabled={updateProduct.isPending} formName={formName} setFormName={setFormName} formBrand={formBrand} setFormBrand={setFormBrand} formPrice={formPrice} setFormPrice={setFormPrice} formCostPrice={formCostPrice} setFormCostPrice={setFormCostPrice} isOwner={isOwner} formAlert={formAlert} setFormAlert={setFormAlert} formImage={formImage} setFormImage={setFormImage} isAdmin={isAdmin} formQuantities={formQuantities} setFormQuantities={setFormQuantities} branches={branchesForEdit} brands={brands} />
+        <ProductFormModal optionFields={optionFields} title="Edit Product" onClose={closeEdit} onDirty={() => setFormDirty(true)} onSubmit={handleEdit} error={formError} buttonLabel={updateProduct.isPending ? 'Saving...' : 'Update Product'} disabled={updateProduct.isPending} formName={formName} setFormName={setFormName} formBrand={formBrand} setFormBrand={setFormBrand} priceScope={priceScope} mixedPrices={mixedPrices} formPrice={formPrice} setFormPrice={v => { setPriceDirty(true); setFormPrice(v); }} formCostPrice={formCostPrice} setFormCostPrice={setFormCostPrice} isOwner={isOwner} formAlert={formAlert} setFormAlert={setFormAlert} formImage={formImage} setFormImage={setFormImage} isAdmin={isAdmin} formQuantities={formQuantities} setFormQuantities={setFormQuantities} branches={branchesForEdit} brands={brands} />
       )}
       {showArchiveModal && archivingProduct && (
         <Modal title="Confirm Archive" onClose={() => { setShowArchiveModal(false); setArchivingProduct(null); }}>
@@ -1103,8 +1130,9 @@ function RestockModal({ products, branches, isOwner, onClose }: { products: Prod
   );
 }
 
-function ProductFormModal({ optionFields, title, onClose, onDirty, onSubmit, buttonLabel, disabled, error, formName, setFormName, formBrand, setFormBrand, formPrice, setFormPrice, formCostPrice, setFormCostPrice, isOwner, formAlert, setFormAlert, formImage, setFormImage, isAdmin, formQuantities, setFormQuantities, branches, brands }: {
+function ProductFormModal({ optionFields, priceScope, mixedPrices, title, onClose, onDirty, onSubmit, buttonLabel, disabled, error, formName, setFormName, formBrand, setFormBrand, formPrice, setFormPrice, formCostPrice, setFormCostPrice, isOwner, formAlert, setFormAlert, formImage, setFormImage, isAdmin, formQuantities, setFormQuantities, branches, brands }: {
   optionFields: ProductOptionsFieldsProps;
+  priceScope: string; mixedPrices: boolean;
   title: string; onClose: () => void; onDirty: () => void; onSubmit: () => void; buttonLabel: string; disabled?: boolean; error?: string | null;
   formName: string; setFormName: (v: string) => void; formBrand: string; setFormBrand: (v: string) => void;
   formPrice: string; setFormPrice: (v: string) => void; formCostPrice: string; setFormCostPrice: (v: string) => void; isOwner: boolean; formAlert: string; setFormAlert: (v: string) => void;
@@ -1131,21 +1159,11 @@ function ProductFormModal({ optionFields, title, onClose, onDirty, onSubmit, but
           <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} className="w-full border border-input-border rounded px-3 py-2 text-sm bg-input-bg focus:outline-none focus:border-input-focus" />
         </div>
         <ProductOptionsFields {...optionFields} branches={branches} onDirty={onDirty} />
-        {optionFields.variantType === 'NONE' && <div>
-          <label className="block text-sm font-medium text-text-primary mb-2">Quantity</label>
-          {branches.length === 1 ? (
-            <NumberStepper min={0} placeholder="0" ariaLabel="Quantity" value={formQuantities[branches[0].id] ?? ''} onChange={(v) => setFormQuantities({ ...formQuantities, [branches[0].id]: v })} className="w-full" />
-          ) : (
-          <div className="divide-y divide-card-border border border-card-border rounded-lg overflow-hidden">
-            {branches.length === 0 && <p className="text-xs text-text-muted px-3 py-3">No shops yet. Create a shop first.</p>}
-            {branches.map((b) => (
-              <div key={b.id} className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:gap-3">
-                <span className="w-full text-xs font-semibold text-text-primary bg-white/10 border-l-[3px] border-accent-blue px-2.5 py-1.5 rounded-r uppercase break-words sm:w-auto sm:min-w-[140px] sm:max-w-[200px]">{b.name}</span>
-                <NumberStepper min={0} placeholder="0" ariaLabel={`${b.name} quantity`} value={formQuantities[b.id] ?? ''} onChange={(v) => setFormQuantities({ ...formQuantities, [b.id]: v })} className="w-full sm:flex-1" />
-              </div>
-            ))}
-          </div>
-          )}
+        {optionFields.variantType === 'NONE' && <div className="space-y-3">
+          <StockBranchPicker branches={branches} value={optionFields.stockBranchId} onChange={optionFields.setStockBranchId} />
+          <label className="block text-sm font-medium">Quantity</label>
+          <NumberStepper min={0} placeholder="0" ariaLabel="Quantity" value={formQuantities[optionFields.stockBranchId] ?? ''}
+            onChange={value => setFormQuantities({ ...formQuantities, [optionFields.stockBranchId]: value })} className="w-full" />
         </div>}
         <div>
           <label className="block text-sm font-medium text-text-primary mb-1">Brand <span className="text-accent-red">*</span></label>
@@ -1160,8 +1178,8 @@ function ProductFormModal({ optionFields, title, onClose, onDirty, onSubmit, but
           </div>
         )}
         <div>
-          <label className="block text-sm font-medium text-text-primary mb-1">Selling Price (₱)</label>
-          <input type="number" step="0.01" min="0" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} placeholder="0" className="w-full border border-input-border rounded px-3 py-2 text-sm bg-input-bg focus:outline-none focus:border-input-focus" />
+          <label className="block text-sm font-medium text-text-primary mb-1">Selling Price (₱) — {priceScope}</label>
+          <input type="number" step="0.01" min="0" aria-label="Selling Price" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} placeholder={mixedPrices ? 'Different branch prices — enter to apply to all' : '0'} className="w-full border border-input-border rounded px-3 py-2 text-sm bg-input-bg focus:outline-none focus:border-input-focus" />
         </div>
         <div>
           <label className="block text-sm font-medium text-text-primary mb-1">Quantity Alert</label>
