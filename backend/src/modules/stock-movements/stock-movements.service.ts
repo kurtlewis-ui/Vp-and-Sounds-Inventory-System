@@ -30,7 +30,13 @@ export class StockMovementsService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.StockMovementWhereInput = {};
-    if (productId) where.productId = productId;
+    if (productId) {
+      if (query.includeOptions === 'true') {
+        where.OR = [{ productId }, { product: { parentId: productId } }];
+      } else {
+        where.productId = productId;
+      }
+    }
     if (branchId) where.branchId = branchId;
 
     const [total, movements] = await Promise.all([

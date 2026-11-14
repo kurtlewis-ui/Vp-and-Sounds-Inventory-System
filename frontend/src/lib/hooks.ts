@@ -1306,12 +1306,13 @@ export function useChangeOwnPassword() {
 // ===========================================================================
 // STOCK MOVEMENTS (product history per branch)
 // ===========================================================================
-export function useStockMovements(params?: { productId?: string; branchId?: string; page?: number; limit?: number }) {
+export function useStockMovements(params?: { productId?: string; branchId?: string; page?: number; limit?: number; includeOptions?: boolean }) {
   return useQuery({
     queryKey: ['stock-movements', params ?? {}],
     queryFn: async () => {
       const res = await api.get('/stock-movements', {
         params: {
+          includeOptions: params?.includeOptions ? 'true' : undefined,
           productId: params?.productId || undefined,
           branchId: params?.branchId || undefined,
           page: params?.page ?? 1,

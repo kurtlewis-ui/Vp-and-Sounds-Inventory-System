@@ -1,8 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsUUID, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsUUID, IsInt, IsIn, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class QueryStockMovementDto {
+  @ApiProperty({ required: false, description: 'Include movements of all flavors/colors of this product' })
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  includeOptions?: string;
   @ApiProperty({ required: false })
   @IsOptional()
   @Type(() => Number)

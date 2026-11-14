@@ -81,6 +81,21 @@ describe('Product flavor/color stock rules', () => {
     await saveProductOptions(prisma, { options: [option({ id: 'black', quantities: [{ branchId: branch, quantity: 12, expectedQuantity: 10 }] })] }, 'owner', 'parent');
     expect(tx.stockMovement.create).toHaveBeenCalledWith({ data: expect.objectContaining({ productId: 'black', quantityChange: 2, quantityAfter: 12 }) });
   });
+  it('preserves stock and price in omitted branches during a selected-branch edit', async () => {
+    const otherBranch = 'branch-b';
+    const { prisma, tx } = fixture(parent({ variantType: 'COLOR',
+      inventory: [{ branchId: branch, quantity: 0, sellingPrice: 550 }, { branchId: otherBranch, quantity: 0, sellingPrice: 600 }],
+      options: [sku({ inventory: [{ branchId: branch, quantity: 10 }, { branchId: otherBranch, quantity: 7 }] })] }));
+    tx.inventory.findUniqueOrThrow.mockImplementation(async ({ where }: any) => ({ sellingPrice: where.productId_branchId.branchId === otherBranch ? 600 : 550 }));
+    await saveProductOptions(prisma, { quantities: [{ branchId: branch, quantity: 0, sellingPrice: 550 }],
+      options: [option({ id: 'black', quantities: [{ branchId: branch, quantity: 9, expectedQuantity: 10 }] })] }, 'owner', 'parent');
+    const hiddenOptionWrite = tx.inventory.upsert.mock.calls.map(([arg]: any[]) => arg)
+      .find((arg: any) => arg.where.productId_branchId.productId === 'black' && arg.where.productId_branchId.branchId === otherBranch);
+    expect(hiddenOptionWrite.create.quantity).toBe(7);
+    expect(hiddenOptionWrite.update).toEqual({ sellingPrice: 600 });
+    expect(tx.stockMovement.create.mock.calls).toHaveLength(1);
+  });
+
   it('serializes totals from active options and never leaks option cost to Admin/Staff/Viewer', async () => {
     const row = parent({ variantType: 'COLOR', inventory: [{ branchId: branch, quantity: 0, sellingPrice: 550 }], options: [sku({ costPrice: 200, sellingPrice: 500 }), sku({ id: 'old', optionName: 'Old', deletedAt: new Date(), costPrice: 200, inventory: [{ branchId: branch, quantity: 0 }] })] });
     const prisma: any = { product: { findFirst: jest.fn(async () => row) } };
