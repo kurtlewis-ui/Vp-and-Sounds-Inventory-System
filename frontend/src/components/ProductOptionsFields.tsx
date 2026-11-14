@@ -16,6 +16,7 @@ export interface ProductOptionsFieldsProps {
   setBranchPrices: (prices: Record<string, string>) => void;
   originalType?: VariantType;
   allocation?: Record<string, number>;
+  singleBranch?: boolean;
 }
 
 export function ProductOptionsFields({
@@ -27,6 +28,7 @@ export function ProductOptionsFields({
   setBranchPrices,
   originalType,
   allocation,
+  singleBranch,
   branches,
   onDirty,
 }: ProductOptionsFieldsProps & {
@@ -82,7 +84,7 @@ export function ProductOptionsFields({
                   </th>
                   {branches.map((b) => (
                     <th key={b.id} className="p-2 min-w-[110px]">
-                      {b.name}
+                      {singleBranch ? 'Quantity' : b.name}
                     </th>
                   ))}
                   <th className="p-2">Status</th>

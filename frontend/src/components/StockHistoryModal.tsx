@@ -51,7 +51,7 @@ export function StockHistoryModal({ productId, productName, branchId, branchName
   const undoStock = useUndoStock();
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const { data, isLoading } = useStockMovements({ productId: optionId || productId, branchId, page, limit: 50 });
+  const { data, isLoading } = useStockMovements({ productId: optionId || productId, branchId, page, limit: 50, includeOptions: !!isOwner && !optionId });
   const movements = Array.isArray(data?.data) ? data.data : [];
   const pagination = data?.pagination;
 
@@ -87,7 +87,7 @@ export function StockHistoryModal({ productId, productName, branchId, branchName
 
         {!!product?.options?.length && <label className="p-3 text-sm">Stock history for
           <select aria-label="Stock history option" className="w-full bg-input-bg border border-input-border rounded p-2" value={optionId} onChange={e => { setOptionId(e.target.value); setPage(1); }}>
-            <option value="">Original product / conversion history</option>
+            <option value="">{isOwner ? 'All flavors/colors and product history' : 'Original product / conversion history'}</option>
             {product.options.map(o => <option key={o.id} value={o.id}>{o.optionName}{o.deletedAt ? ' (Archived)' : ''}</option>)}
           </select>
         </label>}
@@ -108,6 +108,7 @@ export function StockHistoryModal({ productId, productName, branchId, branchName
                     <p className="text-sm font-medium text-text-primary">{m.user ?? 'System'}</p>
                     <p className="text-xs text-text-muted whitespace-nowrap">{formatDateTime(m.createdAt)}</p>
                   </div>
+                  {isOwner && !optionId && <p className="text-sm font-semibold text-text-primary mt-1">{m.productName}</p>}
                   <p className="text-sm text-text-secondary mt-0.5">{m.description || typeLabel(m.type)}</p>
                   <p className="text-sm mt-0.5">
                     <span className="text-text-secondary">Remaining Quantity: </span>

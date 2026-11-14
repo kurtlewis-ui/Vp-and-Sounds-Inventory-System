@@ -287,7 +287,7 @@ export default function ProductsPage() {
     const names = optionRows.map(r => r.name.trim().toLowerCase());
     if (names.some(n => !n) || new Set(names).size !== names.length) throw new Error('Enter unique, nonempty flavor/color names.');
     return { variantType, options: optionRows.map(row => ({ id: row.id, name: row.name.trim(), archived: row.archived,
-      quantities: branches.map(b => {
+      quantities: (showEditModal ? branchesForEdit : branchesForForm).map(b => {
         const quantity = Number(row.quantities[b.id] || 0);
         if (!Number.isInteger(quantity) || quantity < 0) throw new Error('Stock must be a whole number, zero or more.');
         return { branchId: b.id, quantity, expectedQuantity: editingProduct?.options?.find(o => o.id === row.id)?.quantities.find(q => q.branchId === b.id)?.quantity ?? 0 };
@@ -296,12 +296,12 @@ export default function ProductsPage() {
   }
 
   const optionFields: ProductOptionsFieldsProps = { variantType, setVariantType, optionRows, setOptionRows, branchPrices, setBranchPrices,
-    originalType: editingProduct?.variantType ?? 'NONE',
+    originalType: editingProduct?.variantType ?? 'NONE', singleBranch: showEditModal && !!shopFilter,
     allocation: editingProduct && (!editingProduct.variantType || editingProduct.variantType === 'NONE') && variantType !== 'NONE'
       ? Object.fromEntries(editingProduct.quantities.map(q => [q.branchId, q.quantity])) : undefined };
 
   function buildQuantitiesPayload() {
-    if (variantType !== 'NONE') return branches.map(b => {
+    if (variantType !== 'NONE') return (showEditModal ? branchesForEdit : branchesForForm).map(b => {
       const sellingPrice = Number(branchPrices[b.id]?.trim() || formPrice || 0);
       if (!Number.isFinite(sellingPrice) || sellingPrice < 0) throw new Error('Enter a valid selling price.');
       return { branchId: b.id, quantity: 0, sellingPrice };
@@ -325,6 +325,7 @@ export default function ProductsPage() {
     } catch (e) { setFormError(e instanceof Error && !('response' in e) ? e.message : getApiErrorMessage(e)); }
   }
   async function handleEdit() {
+    if (editingProduct && shopFilter && (editingProduct.variantType ?? 'NONE') === 'NONE' && variantType !== 'NONE') { setFormError('Select All Shops to distribute existing stock across flavors/colors.'); return; }
     if (!editingProduct || !formName.trim()) { setFormError('Product name is required.'); return; }
     if (!formBrand) { setFormError('Please select a brand.'); return; }
     setFormError(null);
@@ -416,7 +417,7 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      {optionsProduct && <Modal title={optionsProduct.name} onClose={() => setOptionsProduct(null)}><div className="space-y-3">
+      {!isOwner && optionsProduct && <Modal title={optionsProduct.name} onClose={() => setOptionsProduct(null)}><div className="space-y-3">
         {(optionsProduct.options ?? []).map(o => <div key={o.id} className="border border-card-border rounded p-3">
           <strong>{o.optionName}{o.deletedAt ? ' (Archived)' : ''}</strong>
           {o.quantities.filter(q => !shopFilter || q.branchId === shopFilter).map(q => <div key={q.branchId} className="flex justify-between gap-3 text-sm py-1"><span>{q.branchName}: {q.quantity} units</span><button onClick={() => { setHistoryProduct(o); setShopFilter(q.branchId); }} className="underline">Stock history</button></div>)}
@@ -524,7 +525,7 @@ export default function ProductsPage() {
                       <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center text-[10px] text-text-muted">No Img</div>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-sm text-text-primary font-medium">{product.name}{!!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View {product.variantType === 'FLAVOR' ? 'flavors' : 'colors'}</button>}</td>
+                  <td className="px-3 py-3 text-sm text-text-primary font-medium">{product.name}{!isOwner && !!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View {product.variantType === 'FLAVOR' ? 'flavors' : 'colors'}</button>}</td>
                   <td className="px-3 py-3 text-sm">
                     {shopFilter ? (
                       (() => {
@@ -644,7 +645,7 @@ export default function ProductsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-text-primary">
                         <span className="text-text-muted mr-1.5">{reorderMode ? i + 1 : (entriesPerPage === 'All' ? 0 : (currentPage - 1) * (entriesPerPage as number)) + i + 1}.</span>
-                        {product.name}{!!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View options</button>}
+                        {product.name}{!isOwner && !!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View options</button>}
                       </p>
                       <p className="mt-0.5 text-xs text-text-secondary">{product.brand?.name ?? '—'}</p>
                     </div>
@@ -731,7 +732,7 @@ export default function ProductsPage() {
         <ProductFormModal optionFields={optionFields} title="Add New Product" onClose={closeAdd} onDirty={() => setFormDirty(true)} onSubmit={handleAdd} error={formError} buttonLabel={createProduct.isPending ? 'Saving...' : 'Save Product'} disabled={createProduct.isPending} formName={formName} setFormName={setFormName} formBrand={formBrand} setFormBrand={setFormBrand} formPrice={formPrice} setFormPrice={setFormPrice} formCostPrice={formCostPrice} setFormCostPrice={setFormCostPrice} isOwner={isOwner} formAlert={formAlert} setFormAlert={setFormAlert} formImage={formImage} setFormImage={setFormImage} isAdmin={isAdmin} formQuantities={formQuantities} setFormQuantities={setFormQuantities} branches={branchesForForm} brands={brands} />
       )}
       {showEditModal && editingProduct && (
-        <ProductFormModal optionFields={optionFields} title="Edit Product" onClose={closeEdit} onDirty={() => setFormDirty(true)} onSubmit={handleEdit} error={formError} buttonLabel={updateProduct.isPending ? 'Saving...' : 'Update Product'} disabled={updateProduct.isPending} formName={formName} setFormName={setFormName} formBrand={formBrand} setFormBrand={setFormBrand} formPrice={formPrice} setFormPrice={setFormPrice} formCostPrice={formCostPrice} setFormCostPrice={setFormCostPrice} isOwner={isOwner} formAlert={formAlert} setFormAlert={setFormAlert} formImage={formImage} setFormImage={setFormImage} isAdmin={isAdmin} formQuantities={formQuantities} setFormQuantities={setFormQuantities} branches={variantType !== 'NONE' ? branches : branchesForEdit} brands={brands} />
+        <ProductFormModal optionFields={optionFields} title="Edit Product" onClose={closeEdit} onDirty={() => setFormDirty(true)} onSubmit={handleEdit} error={formError} buttonLabel={updateProduct.isPending ? 'Saving...' : 'Update Product'} disabled={updateProduct.isPending} formName={formName} setFormName={setFormName} formBrand={formBrand} setFormBrand={setFormBrand} formPrice={formPrice} setFormPrice={setFormPrice} formCostPrice={formCostPrice} setFormCostPrice={setFormCostPrice} isOwner={isOwner} formAlert={formAlert} setFormAlert={setFormAlert} formImage={formImage} setFormImage={setFormImage} isAdmin={isAdmin} formQuantities={formQuantities} setFormQuantities={setFormQuantities} branches={branchesForEdit} brands={brands} />
       )}
       {showArchiveModal && archivingProduct && (
         <Modal title="Confirm Archive" onClose={() => { setShowArchiveModal(false); setArchivingProduct(null); }}>

@@ -338,16 +338,6 @@ function AddPurchaseModal({
       {/* max-h + overflow-y-auto so the whole form (incl. Save/Dispose buttons)
           stays reachable on small phone screens; lighter padding on mobile. */}
       <div className="glass relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl p-5 sm:p-8 shadow-xl">
-        {needsOption && <label className="block mb-4 text-sm font-medium">{parentProduct.variantType === 'FLAVOR' ? 'Flavor' : 'Color'}
-          <select aria-label="Choose flavor or color" value={selectedOptionId} onChange={e => { setSelectedOptionId(e.target.value); setQuantity('1'); setDirty(true); }} className="w-full rounded border border-input-border bg-input-bg px-3 py-2">
-            <option value="">Choose an option</option>
-            {(parentProduct.options ?? []).filter(o => !o.deletedAt).map(o => {
-              const staged = draftItems.filter(i => i.productId === o.id).reduce((sum, i) => sum + i.quantity, 0) + draftDisposalItems.filter(i => i.productId === o.id).reduce((sum, i) => sum + i.quantity, 0);
-              const remaining = Math.max(0, o.totalQuantity - staged);
-              return <option key={o.id} value={o.id} disabled={!remaining}>{o.optionName} — {remaining} available</option>;
-            })}
-          </select>
-        </label>}
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-lg font-bold text-text-primary">Add Purchase</h3>
           <button onClick={guardedClose} className="text-text-muted hover:text-text-primary transition"><X size={20} /></button>
@@ -374,6 +364,17 @@ function AddPurchaseModal({
         </div>
 
         <div className="space-y-5" onInput={() => setDirty(true)}>
+        {needsOption && <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">{parentProduct.variantType === 'FLAVOR' ? 'Flavor' : 'Color'}
+          <select aria-label="Choose flavor or color" value={selectedOptionId} onChange={e => { setSelectedOptionId(e.target.value); setQuantity('1'); setDirty(true); }} className="h-11 w-full rounded-lg border border-input-border bg-input-bg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-input-focus">
+            <option value="">{parentProduct.variantType === 'FLAVOR' ? 'Select flavor' : 'Select color'}</option>
+            {(parentProduct.options ?? []).filter(o => !o.deletedAt).map(o => {
+              const staged = draftItems.filter(i => i.productId === o.id).reduce((sum, i) => sum + i.quantity, 0) + draftDisposalItems.filter(i => i.productId === o.id).reduce((sum, i) => sum + i.quantity, 0);
+              const remaining = Math.max(0, o.totalQuantity - staged);
+              return <option key={o.id} value={o.id} disabled={!remaining}>{o.optionName} — {remaining} available</option>;
+            })}
+          </select>
+        </label>}
+
           {/* Quantity */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">Quantity</label>
