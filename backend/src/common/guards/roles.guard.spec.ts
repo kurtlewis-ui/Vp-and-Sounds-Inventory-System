@@ -40,14 +40,9 @@ describe('RolesGuard', () => {
     expect(guard.canActivate(contextFor({ role: 'Admin' }))).toBe(false);
   });
 
-  it('denies a Viewer on an Owner/Admin-only route', () => {
-    const guard = guardWithRequiredRoles(['Owner', 'Admin']);
-    expect(guard.canActivate(contextFor({ role: 'Viewer' }))).toBe(false);
-  });
-
-  it('allows a Viewer on a route that includes Viewer (e.g. stock-movements read)', () => {
-    const guard = guardWithRequiredRoles(['Owner', 'Admin', 'Viewer']);
-    expect(guard.canActivate(contextFor({ role: 'Viewer' }))).toBe(true);
+  it('denies unsupported roles even if a route mistakenly lists one', () => {
+    const guard = guardWithRequiredRoles(['Owner', 'RemovedRole']);
+    expect(guard.canActivate(contextFor({ role: 'RemovedRole' }))).toBe(false);
   });
 
   it('denies when there is no authenticated user', () => {

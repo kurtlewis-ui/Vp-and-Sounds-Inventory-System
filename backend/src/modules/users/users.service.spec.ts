@@ -22,7 +22,7 @@ describe('UsersService — permissions', () => {
   beforeEach(async () => {
     const mockPrisma = {
       user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
-      role: { findUnique: jest.fn() },
+      role: { findUnique: jest.fn(), findMany: jest.fn() },
       branch: { findFirst: jest.fn() },
       session: { deleteMany: jest.fn() },
       auditLog: { create: jest.fn() },
@@ -42,6 +42,30 @@ describe('UsersService — permissions', () => {
   });
 
   // ---- create --------------------------------------------------------------
+  it('lists only supported roles', async () => {
+    prisma.role.findMany.mockResolvedValue([]);
+    await service.getRoles();
+    expect(prisma.role.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { name: { in: ['Owner', 'Admin', 'Staff'] } },
+    }));
+  });
+
+  it('rejects creation with an unsupported role even for an Owner', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.role.findUnique.mockResolvedValue({ id: 'retired', name: 'RemovedRole' });
+    await expect(service.create({ email: 'retired@test.invalid', roleId: 'retired' } as any, 'owner-1', OWNER_ROLE))
+      .rejects.toThrow('Unsupported account role');
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects assigning an unsupported role even for an Owner', async () => {
+    prisma.user.findFirst.mockResolvedValue({ id: 'staff', role: { name: 'Staff' } });
+    prisma.role.findUnique.mockResolvedValue({ id: 'retired', name: 'RemovedRole' });
+    await expect(service.update('staff', { roleId: 'retired' } as any, 'owner-1', OWNER_ROLE))
+      .rejects.toThrow('Unsupported account role');
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
   describe('create', () => {
     it('forbids an Admin from creating a non-Staff (Admin) account', async () => {
       prisma.user.findUnique.mockResolvedValue(null); // email free

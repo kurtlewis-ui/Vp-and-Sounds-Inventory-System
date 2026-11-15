@@ -1,3 +1,4 @@
+import { isSupportedRole } from '../../common/utils/roles';
 import {
   Injectable,
   UnauthorizedException,
@@ -38,7 +39,7 @@ export class AuthService {
     }
 
     // Check if account is active
-    if (!user.isActive) {
+    if (!user.isActive || !isSupportedRole(user.role?.name)) {
       throw new ForbiddenException('Account is disabled');
     }
 
@@ -132,7 +133,7 @@ export class AuthService {
       include: { role: true, branch: true },
     });
 
-    if (!user || !user.isActive || user.isLocked) {
+    if (!user || !user.isActive || user.isLocked || !isSupportedRole(user.role?.name)) {
       throw new UnauthorizedException('Invalid user');
     }
 

@@ -1,3 +1,4 @@
+import { isSupportedRole } from '../utils/roles';
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
@@ -22,6 +23,6 @@ export class RolesGuard implements CanActivate {
       return false;
     }
 
-    return requiredRoles.some((role) => user.role === role);
+    return isSupportedRole(user.role) && requiredRoles.some((role) => user.role === role);
   }
 }

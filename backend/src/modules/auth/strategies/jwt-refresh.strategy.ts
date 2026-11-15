@@ -1,3 +1,4 @@
+import { isSupportedRole } from '../../../common/utils/roles';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
@@ -52,7 +53,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
     }
 
     // Check user status
-    if (!session.user.isActive || session.user.isLocked) {
+    if (!session.user.isActive || session.user.isLocked || !isSupportedRole(session.user.role?.name)) {
       throw new UnauthorizedException('User account disabled');
     }
 

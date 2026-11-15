@@ -1,3 +1,4 @@
+import { isSupportedRole } from '../../../common/utils/roles';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
@@ -47,7 +48,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     // Fast path: reuse a recent validation (skips both DB queries below).
     const cached = authCache.get(cacheKey);
-    if (cached && cached.expiresAt > now) {
+    if (cached && cached.expiresAt > now && isSupportedRole(cached.user.role)) {
       return cached.user;
     }
 
@@ -57,7 +58,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       include: { role: true },
     });
 
-    if (!user || !user.isActive || user.isLocked) {
+    if (!user || !user.isActive || user.isLocked || !isSupportedRole(user.role?.name)) {
       authCache.delete(cacheKey);
       throw new UnauthorizedException('Invalid token or user account disabled');
     }

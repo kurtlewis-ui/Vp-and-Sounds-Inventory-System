@@ -115,11 +115,11 @@ describe('Product flavor/color stock rules', () => {
     expect(result.options[0].quantities[0].quantity).toBe(9);
   });
 
-  it('serializes totals from active options and never leaks option cost to Admin/Staff/Viewer', async () => {
+  it('serializes totals from active options and never leaks option cost to Admin/Staff', async () => {
     const row = parent({ variantType: 'COLOR', inventory: [{ branchId: branch, quantity: 0, sellingPrice: 550 }], options: [sku({ costPrice: 200, sellingPrice: 500 }), sku({ id: 'old', optionName: 'Old', deletedAt: new Date(), costPrice: 200, inventory: [{ branchId: branch, quantity: 0 }] })] });
     const prisma: any = { product: { findFirst: jest.fn(async () => row) } };
     const service = new ProductsService(prisma, {} as any);
-    for (const role of ['Admin', 'Staff', 'Viewer']) {
+    for (const role of ['Admin', 'Staff']) {
       const result = await service.findOne('parent', role);
       expect(result.totalQuantity).toBe(10);
       expect(result.options[0].sellingPrice).toBe(550);

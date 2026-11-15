@@ -55,10 +55,10 @@ export class BranchesService {
    * Owner/Admin sees every (non-deleted) branch.
    * Staff sees only the branch they are assigned to (if any).
    */
-  async findAll(viewer: { userId: string; role: string }) {
-    if (viewer.role === 'Staff') {
+  async findAll(actor: { userId: string; role: string }) {
+    if (actor.role === 'Staff') {
       const me = await this.prisma.user.findUnique({
-        where: { id: viewer.userId },
+        where: { id: actor.userId },
         select: { branchId: true },
       });
 
