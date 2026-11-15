@@ -364,10 +364,10 @@ export interface ProductMutationInput {
   quantities?: { branchId: string; quantity: number }[];
 }
 
-export function useProducts(params?: { search?: string; brandId?: string; branchId?: string; page?: number; limit?: number; all?: boolean; requireBranch?: boolean }) {
+export function useProducts(params?: { search?: string; brandId?: string; branchId?: string; page?: number; limit?: number; all?: boolean; requireBranch?: boolean }, enabled = true) {
   return useQuery({
     queryKey: ['products', params ?? {}],
-    enabled: !params?.requireBranch || !!params?.branchId,
+    enabled: enabled && (!params?.requireBranch || !!params?.branchId),
     refetchOnWindowFocus: false,
     refetchInterval: false,
     refetchOnMount: params?.requireBranch ? false : true,
@@ -777,7 +777,7 @@ export function useSalesPending(params?: {
   branchId?: string;
   startDate?: string;
   endDate?: string;
-}) {
+}, enabled = true) {
   return useQuery({
     queryKey: ['sales', 'pending', params ?? {}],
     queryFn: () =>
@@ -789,6 +789,7 @@ export function useSalesPending(params?: {
         endDate: params?.endDate || undefined,
       }),
     refetchInterval: shouldPoll,
+    enabled,
   });
 }
 
