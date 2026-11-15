@@ -29,7 +29,6 @@ import { Select } from '@/components/Select';
 import { DateTimeStack } from '@/components/DateTimeStack';
 import { ProductThumb } from '@/components/ProductThumb';
 import { withScrollPreserved } from '@/lib/useUnsavedGuard';
-import { useStoredBranch } from '@/lib/useStoredBranch';
 import { filterSalesByProduct } from '@/lib/sale-search';
 import { msUntilNextBusinessDay } from '@/lib/business-day';
 import { useAuthStore } from '@/lib/store';
@@ -178,17 +177,16 @@ export default function SalesPendingPage() {
   const { data: branchData } = useBranches();
   const branches = branchData?.data ?? [];
 
-  // No "All Shops" here — always scoped to one branch. Shared+persisted across
-  // the site, so the branch you were working on is remembered on refresh; the
-  // hook auto-selects the first branch when none/invalid is stored.
-  const [selectedShop, setSelectedShop] = useStoredBranch(branches, { allowAll: false });
+  // Each visit starts on the first active branch, independently of other pages.
+  const [chosenShop, setSelectedShop] = useState('');
+  const selectedShop = branches.some(b => b.id === chosenShop) ? chosenShop : branches[0]?.id ?? '';
 
   // Load the FULL active catalog for the currently-selected branch (not the
   // default 20-row first page, which made the Edit Sale modal wrongly flag
   // most sold items as "no longer exists"). Scoped to the branch so the prices
   // shown match what that branch charges. All pending sales here belong to this
   // branch, so this is the right catalog for editing them.
-  const { data: productData } = useProducts({ branchId: selectedShop || undefined, limit: 1000 });
+  const { data: productData } = useProducts({ branchId: selectedShop || undefined, limit: 1000 }, !!selectedShop);
   const products = productData?.data ?? [];
 
   // Note: search is applied CLIENT-SIDE (see filterSalesByProduct) so it filters
@@ -197,7 +195,7 @@ export default function SalesPendingPage() {
   // is the behavior we're replacing.
   const { data, isLoading, isError, error } = useSalesPending({
     branchId: selectedShop || undefined,
-  });
+  }, !!selectedShop);
   const sales = useMemo(() => filterSalesByProduct(data?.data ?? [], search), [data?.data, search]);
   const summary = data?.summary ?? { grossSales: 0, cash: 0, gcash: 0, bpi: 0, bdo: 0, discount: 0, total: 0, count: 0 };
 
@@ -215,7 +213,7 @@ export default function SalesPendingPage() {
   const { data: disposalData, isLoading: dispLoading } = useDisposalsPending({
     search,
     branchId: selectedShop || undefined,
-  }, !isAdmin);
+  }, !isAdmin && !!selectedShop);
   const disposals = disposalData?.data ?? [];
   const approveDisposal = useApproveDisposal();
   const declineDisposal = useDeclineDisposal();
@@ -224,14 +222,14 @@ export default function SalesPendingPage() {
   const { data: expenseData, isLoading: expLoading } = useExpensesPending({
     search,
     branchId: selectedShop || undefined,
-  }, !isAdmin);
+  }, !isAdmin && !!selectedShop);
   const expenses = expenseData?.data ?? [];
   const approveExpense = useApproveExpense();
   const declineExpense = useDeclineExpense();
 
   // Staff draft carts (not yet submitted). Section is hidden for Admin, so
   // skip the polling query too.
-  const { data: draftsData, isLoading: draftsLoading } = useStaffDrafts(selectedShop || undefined, !isAdmin);
+  const { data: draftsData, isLoading: draftsLoading } = useStaffDrafts(selectedShop || undefined, !isAdmin && !!selectedShop);
   const drafts = draftsData ?? [];
   const saveDraftForStaff = useSaveDraftForStaff();
   const clearStaffDraft = useClearStaffDraft();

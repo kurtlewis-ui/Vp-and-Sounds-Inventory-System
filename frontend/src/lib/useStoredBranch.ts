@@ -9,10 +9,11 @@ interface BranchLike {
 
 /**
  * Shared "currently-selected branch" for the owner/admin page-level branch
- * filters (Pending Sales, Sales Records, Disposals, Products, dashboard
+ * filters (Sales Records, Disposals, dashboard
  * Profit & Loss). Backed by a persisted Zustand store, so the branch you pick
  * on one page survives a refresh and follows you to the other filter pages —
  * instead of resetting to the first branch / "All Shops" every time.
+ * Products and Pending Sales use page-local defaults instead.
  *
  * Options:
  *   - branches:   the live branch list (used to validate the stored id).

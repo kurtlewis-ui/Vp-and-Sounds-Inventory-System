@@ -38,7 +38,6 @@ import { StockHistoryModal } from '@/components/StockHistoryModal';
 import { Select } from '@/components/Select';
 import { NumberStepper } from '@/components/NumberStepper';
 import { useUnsavedGuard, withScrollPreserved } from '@/lib/useUnsavedGuard';
-import { useStoredBranch } from '@/lib/useStoredBranch';
 
 const ENTRIES_OPTIONS = [5, 10, 25, 50, 100, 'All'] as const;
 
@@ -62,8 +61,11 @@ export default function ProductsPage() {
   const { data: brandData } = useBrands();
   const branches = branchData?.data ?? [];
   const brands = brandData?.data ?? [];
-  // Shared+persisted branch filter ('' = All Shops), remembered across the site.
-  const [shopFilter, setShopFilter] = useStoredBranch(branches);
+  // Products always opens on All Shops; choices stay local to this visit.
+  const [shopFilter, setShopFilter] = useState('');
+  useEffect(() => {
+    if (branchData && shopFilter && !branches.some(b => b.id === shopFilter)) setShopFilter('');
+  }, [branchData, branches, shopFilter]);
   // Product management (add / edit / restock / import / reorder / archive) is
   // Owner-only — the backend enforces this too (PR: admin authorization). Admin
   // gets a strictly READ-ONLY products page: it can view stock and open the
