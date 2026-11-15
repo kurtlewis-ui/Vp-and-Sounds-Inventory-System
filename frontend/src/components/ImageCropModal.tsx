@@ -132,7 +132,7 @@ export function ImageCropModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} aria-hidden="true" />
-      <div className="glass relative w-full max-w-sm rounded-xl p-5 shadow-2xl shadow-black/40">
+      <div className="glass relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-xl p-5 shadow-2xl shadow-black/40">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-text-primary">{title}</h2>
           <button onClick={onCancel} aria-label="Close" className="rounded-lg p-1 text-text-muted transition hover:text-text-primary">

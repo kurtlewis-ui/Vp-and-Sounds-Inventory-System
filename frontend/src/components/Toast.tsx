@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { useThemeStore } from '@/lib/theme';
 
 /**
  * Global toast system — professional title + subtitle cards with an animated
@@ -77,6 +78,7 @@ const ToastContext = createContext<ToastApi | null>(null);
 let nextId = 1;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const contentTheme = useThemeStore(s => s.contentTheme);
   // Exactly one toast is ever visible (null = none). Coalescing rapid repeats
   // means a burst of identical notifications never bombards the user.
   const [toast, setToast] = useState<ToastItem | null>(null);
@@ -125,7 +127,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           layout. Top-right keeps it clear of the bottom-right floating Draft
           Order button on the staff pages. At most one toast exists at a time
           (see push); rapid repeats coalesce into it with a ×N count. */}
-      <div className="pointer-events-none fixed top-4 right-4 z-[100] flex w-[min(92vw,380px)] flex-col gap-2.5">
+      <div className={`pointer-events-none fixed top-4 right-4 z-[100] flex w-[min(92vw,380px)] flex-col gap-2.5 ${contentTheme === 'light' ? 'content-light' : ''}`}>
         {toast && <ToastCard key={toast.id} toast={toast} onDismiss={() => remove(toast.id)} />}
       </div>
     </ToastContext.Provider>

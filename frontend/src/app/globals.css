@@ -57,9 +57,10 @@ body {
   --content-table-header-text: #4a4a46;
   /* Deep neutral charcoal for maximum legibility of key data (SKU, totals). */
   --content-text-primary: #1e1e1c;
+  color: var(--content-text-primary);
   --content-text-secondary: #52514d;
   /* Muted metadata — tuned for ~4.6:1 contrast on the neutral canvas. */
-  --content-text-muted: #77766f;
+  --content-text-muted: #6f6e67;
   --content-text-link: #45443f;
   --content-surface-muted: #ececea;    /* soft neutral chip/hover surface */
   /* Inputs sit a touch below the canvas with a defined hairline border so they
@@ -79,8 +80,8 @@ body {
      override the global accent-* tokens only within .content-light. Info/edit
      uses a neutral-leaning blue so it no longer casts a cool tone. */
   --content-accent-green: #3f7a54;     /* In Stock — subtle green */
-  --content-accent-orange: #b0790f;    /* Low Stock — soft amber */
-  --content-accent-red: #b4544e;       /* Out of Stock / errors — muted red */
+  --content-accent-orange: #94620b;    /* Low Stock — readable on canvas/cards */
+  --content-accent-red: #a94c46;       /* Errors — readable on canvas/cards */
   --content-accent-blue: #4a6591;      /* info / edit — muted, low-chroma blue */
   color-scheme: light;
   /* A whisper of neutral light from the top so the canvas feels gently lit
@@ -97,6 +98,8 @@ body {
 .content-light .text-accent-orange { color: var(--content-accent-orange) !important; }
 .content-light .text-accent-red { color: var(--content-accent-red) !important; }
 .content-light .text-accent-blue { color: var(--content-accent-blue) !important; }
+.content-light .text-accent-purple { color: #7047a5 !important; }
+.content-light .text-accent-purple-light { color: var(--content-text-primary) !important; }
 .content-light .bg-accent-green { background-color: var(--content-accent-green) !important; }
 .content-light .bg-accent-orange { background-color: var(--content-accent-orange) !important; }
 .content-light .bg-accent-red { background-color: var(--content-accent-red) !important; }

@@ -1,16 +1,17 @@
+'use client';
+
 import Link from 'next/link';
-import { Package } from 'lucide-react';
+import { useThemeStore } from '@/lib/theme';
 
 /**
  * App-wide 404 page. Replaces Next's default unstyled 404 with a branded,
  * on-theme screen and a way back into the app.
  */
 export default function NotFound() {
+  const theme = useThemeStore(s => s.contentTheme);
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-page-bg px-6 text-center">
-      {/* Box/package logo via the lucide icon so it's theme-aware (inherits
-          text-text-primary) on this page's light-or-dark background. */}
-      <Package className="mb-6 h-16 w-16 text-text-primary" strokeWidth={1.6} aria-label="Vape and Sounds" />
+    <main className={`flex min-h-screen flex-col items-center justify-center bg-page-bg px-6 text-center ${theme === 'light' ? 'content-light' : ''}`}>
+      <img src="/logo.png" alt="Vape and Sounds" className="mb-6 h-16 w-16 rounded-full object-cover ring-2 ring-white" />
       <p className="text-6xl font-black tracking-tight text-text-primary">404</p>
       <h1 className="mt-2 text-xl font-bold text-text-primary">Page not found</h1>
       <p className="mt-2 max-w-sm text-sm text-text-secondary">
