@@ -1,3 +1,4 @@
+import { isSupportedRole, SUPPORTED_ROLES } from '../../common/utils/roles';
 import {
   Injectable,
   NotFoundException,
@@ -40,6 +41,8 @@ export class UsersService {
     if (!role) {
       throw new NotFoundException('Role not found');
     }
+
+    if (!isSupportedRole(role.name)) throw new BadRequestException('Unsupported account role.');
 
     // Account-creation authority by role:
     //   - Owner:  may create any account (Owner, Admin, Staff).
@@ -251,6 +254,8 @@ export class UsersService {
       if (!newRole) {
         throw new NotFoundException('Role not found');
       }
+
+      if (!isSupportedRole(newRole.name)) throw new BadRequestException('Unsupported account role.');
 
       // A non-Owner (Admin) may only ever assign the Staff role. This blocks a
       // non-Owner from promoting anyone TO Admin or Owner (privilege
@@ -556,6 +561,7 @@ export class UsersService {
 
   async getRoles() {
     return this.prisma.role.findMany({
+      where: { name: { in: [...SUPPORTED_ROLES] } },
       select: {
         id: true,
         name: true,

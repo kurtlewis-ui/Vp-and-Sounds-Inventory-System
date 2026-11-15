@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 const BCRYPT_ROUNDS = 12;
 
-// The only bootstrap data a real deployment needs: the two roles and a single
+// The only bootstrap data a real deployment needs: the three roles and a single
 // Admin account to log in with. Everything else (shops, brands, products,
 // users, sales) is created through the app. No demo/sample data.
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@chxinventory.com';
@@ -58,20 +58,7 @@ async function main() {
     },
   });
 
-  // Viewer: a strictly read-only role. It can see the Products page and open a
-  // product's stock-movement history, but cannot add, edit, archive, restock
-  // or otherwise change anything. Only an Owner can assign this role.
-  await prisma.role.upsert({
-    where: { name: 'Viewer' },
-    update: {},
-    create: {
-      name: 'Viewer',
-      description: 'Read-only: view products and stock movement history',
-      permissions: { catalog: ['read'] },
-    },
-  });
-
-  console.log('✅ Roles ready (Owner, Admin, Staff, Viewer)');
+  console.log('✅ Roles ready (Owner, Admin, Staff)');
 
   // 2. Owner account ---------------------------------------------------------
   const ownerPasswordHash = await bcrypt.hash('OwnerPass123!', BCRYPT_ROUNDS);

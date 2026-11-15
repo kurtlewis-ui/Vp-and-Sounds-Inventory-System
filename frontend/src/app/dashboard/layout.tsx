@@ -64,7 +64,7 @@ const ownerNavItems: NavItem[] = [
   },
 ];
 
-// Admin is a viewer/approver: it sees most of what the Owner sees, but the
+// Admin is a reviewer/approver: it sees most of what the Owner sees, but the
 // pages themselves render read-only (no create/edit/restock/delete) and never
 // expose cost. The only actions Admin performs are approving/declining pending
 // sales, disposals and expenses, plus managing Staff accounts + branch
@@ -107,14 +107,6 @@ const adminNavItems: NavItem[] = [
       { label: 'Branch Product Archive', href: '/dashboard/archive/branch-products' },
     ],
   },
-];
-
-// Viewer is a strictly read-only role: its ONLY page is Products (view the
-// catalog + open each product's stock-movement history). No add/edit/archive,
-// no other sections. The Products page itself hides every mutating control for
-// a Viewer, and the backend denies all mutations.
-const viewerNavItems: NavItem[] = [
-  { label: 'Products', href: '/dashboard/products', icon: <Package size={18} /> },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -160,18 +152,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       router.replace('/login');
     } else if (mounted && user && user.role?.name === 'Staff') {
       router.replace('/staff');
-    } else if (
-      mounted &&
-      user &&
-      user.role?.name === 'Viewer' &&
-      !pathname.startsWith('/dashboard/products') &&
-      pathname !== '/dashboard/settings'
-    ) {
-      // Viewer may ONLY be on the Products page (and its own Settings). Any
-      // other dashboard URL (typed directly or linked) bounces back to Products.
-      router.replace('/dashboard/products');
+    } else if (mounted && accessToken && !['Owner', 'Admin', 'Staff'].includes(user?.role?.name ?? '')) {
+      logout();
+      router.replace('/login');
     }
-  }, [mounted, accessToken, user, router, pathname]);
+  }, [mounted, accessToken, user, router, pathname, logout]);
 
   function handleLogout() {
     logout();
@@ -185,8 +170,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const roleName = user?.role?.name;
   const isAdmin = roleName === 'Admin';
-  const isViewer = roleName === 'Viewer';
-  const navItems = isViewer ? viewerNavItems : isAdmin ? adminNavItems : ownerNavItems;
+  const navItems = isAdmin ? adminNavItems : ownerNavItems;
 
   const isActive = (item: NavItem) => {
     if (item.href === '/dashboard') return pathname === '/dashboard';
@@ -207,7 +191,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!accessToken || (user && user.role?.name === 'Staff')) {
+  if (!accessToken || !['Owner', 'Admin'].includes(roleName ?? '')) {
     return null;
   }
 
@@ -371,7 +355,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* FIXED, theme-aware brand wallpaper behind the content area. Only shown
-          to Owner and Admin (not Viewer). Sits in the content column (offset
+          to Owner and Admin. Sits in the content column (offset
           past the 240px sidebar on desktop), stays put while the page scrolls,
           and never intercepts clicks (pointer-events-none). The wallpaper
           already contains the faceted texture + centered logo in one image, so

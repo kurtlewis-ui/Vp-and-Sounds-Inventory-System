@@ -1,5 +1,7 @@
 'use client';
 
+import { roleLandingPath } from '@/lib/roles';
+
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
@@ -16,8 +18,12 @@ export default function Home() {
       return;
     }
     const role = user?.role?.name;
-    const landing =
-      role === 'Staff' ? '/staff' : role === 'Viewer' ? '/dashboard/products' : '/dashboard';
+    const landing = roleLandingPath(role);
+    if (!landing) {
+      useAuthStore.getState().logout();
+      router.replace('/login');
+      return;
+    }
     router.replace(landing);
   }, [accessToken, user, router]);
 

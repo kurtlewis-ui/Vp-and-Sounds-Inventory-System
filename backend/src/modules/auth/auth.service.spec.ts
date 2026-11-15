@@ -89,6 +89,20 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
+    it('rejects unsupported roles without issuing a session', async () => {
+      prisma.user.findUnique.mockResolvedValue({ ...mockUser, role: { name: 'RemovedRole' } });
+      await expect(service.login({ email: mockUser.email, password: 'password' }, '127.0.0.1', 'jest'))
+        .rejects.toThrow(ForbiddenException);
+      expect(prisma.session.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects refresh for an unsupported role', async () => {
+      prisma.user.findUnique.mockResolvedValue({ ...mockUser, role: { name: 'RemovedRole' } });
+      await expect(service.refreshToken(mockUser.id, 'session', '127.0.0.1'))
+        .rejects.toThrow(UnauthorizedException);
+      expect(prisma.session.update).not.toHaveBeenCalled();
+    });
+
     it('should throw UnauthorizedException when user not found', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 

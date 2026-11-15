@@ -1,3 +1,4 @@
+import { isSupportedRole } from '../../common/utils/roles';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ExpenseStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -207,11 +208,8 @@ export class ExpensesService {
   }
 
   private async resolveBranchForActor(actor: RequestUser, branchId?: string) {
-    // The Viewer role is strictly read-only. Block it from any write that
-    // routes through here (expense creation) — a defence-in-depth check so a
-    // crafted request can't create records the UI never offers Viewers.
-    if (actor.role === 'Viewer') {
-      throw new ForbiddenException('Viewer accounts are read-only.');
+    if (!isSupportedRole(actor.role)) {
+      throw new ForbiddenException('Unsupported account role.');
     }
     if (actor.role === 'Staff') {
       const me = await this.prisma.user.findUnique({

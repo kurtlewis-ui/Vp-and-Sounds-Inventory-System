@@ -16,7 +16,7 @@ stored on Cloudinary.
 
 ## 🎯 Overview
 
-- **Role-based access** — Owner, Admin, Staff, and a read-only Viewer role.
+- **Role-based access** — Owner, Admin, and Staff.
 - **Per-branch catalog & inventory** — each shop has its own stock levels and
   can override a product's selling price; products/brands can be archived
   globally or per branch.
@@ -128,8 +128,7 @@ first login.
   sales, disposals, and expenses; cost-free Sales Summary (no profit figures).
 - **Staff** — branch-scoped POS: build and submit sales/disposals/expenses,
   view products and their own daily report.
-- **Viewer** — read-only: view products and stock-movement history; cannot
-  change anything.
+
 
 ## 🔐 Security
 
@@ -180,7 +179,7 @@ The repo is wired for **Supabase + Render + Vercel**:
 ```
 backend/    NestJS API (modules: auth, users, branches, brands, products,
             sales, disposals, expenses, stats, stock-movements, activity-logs)
-frontend/   Next.js app (dashboard = Owner/Admin/Viewer, staff = POS portal)
+frontend/   Next.js app (dashboard = Owner/Admin, staff = POS portal)
 brand-assets/  Source brand images (logos, wallpapers)
 docs/       Design/reference docs (aspirational — not all of it is implemented)
 ```

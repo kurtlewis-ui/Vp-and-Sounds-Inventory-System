@@ -21,7 +21,7 @@ const OWNER: RequestUser = { userId: 'owner-1', email: 'o@x.com', role: 'Owner',
 const ADMIN: RequestUser = { userId: 'admin-1', email: 'a@x.com', role: 'Admin', sessionId: 's2' };
 const STAFF: RequestUser = { userId: 'staff-1', email: 's@x.com', role: 'Staff', sessionId: 's3' };
 const OTHER_STAFF: RequestUser = { userId: 'staff-2', email: 's2@x.com', role: 'Staff', sessionId: 's4' };
-const VIEWER: RequestUser = { userId: 'viewer-1', email: 'v@x.com', role: 'Viewer', sessionId: 's5' };
+const UNSUPPORTED: RequestUser = { userId: 'unsupported-1', email: 'v@x.com', role: 'RemovedRole', sessionId: 's5' };
 
 const BRANCH_ID = '11111111-1111-1111-1111-111111111111';
 
@@ -160,13 +160,13 @@ describe('SalesService', () => {
 
   // ---- create: branch resolution for staff --------------------------------
   describe('create — branch resolution', () => {
-    it('blocks the read-only Viewer role from creating a sale', async () => {
+    it('blocks an unsupported account role from creating a sale', async () => {
       await expect(
         service.create(
           { branchId: BRANCH_ID, items: [{ productId: 'prod-1', quantity: 1, paymentMethod: PaymentMethod.Cash }] },
-          VIEWER,
+          UNSUPPORTED,
         ),
-      ).rejects.toThrow(/read-only/i);
+      ).rejects.toThrow(/unsupported account role/i);
     });
 
     it('rejects a staff with no assigned branch', async () => {

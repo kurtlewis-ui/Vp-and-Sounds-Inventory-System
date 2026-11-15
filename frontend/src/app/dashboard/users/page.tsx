@@ -43,7 +43,6 @@ function RoleBadge({ role }: { role: string }) {
     Owner: 'bg-accent-purple/15 text-accent-purple border-accent-purple/30',
     Admin: 'bg-accent-blue/15 text-accent-blue border-accent-blue/30',
     Staff: 'bg-accent-green/15 text-accent-green border-accent-green/30',
-    Viewer: 'bg-accent-cyan/15 text-accent-cyan border-accent-cyan/30',
   };
   const cls = map[role] ?? 'bg-surface-muted text-text-secondary border-card-border';
   return (
@@ -715,7 +714,7 @@ function OwnerUsersView() {
             </div>
             <div className="flex items-center gap-2.5">
               <label className="text-sm text-text-secondary">Role</label>
-              <Select value={roleFilter} onChange={(v) => { setRoleFilter(v); setCurrentPage(1); }} ariaLabel="Filter by role" className="w-auto min-w-[130px]" options={[{ value: '', label: 'All Roles' }, { value: 'Owner', label: 'Owner' }, { value: 'Admin', label: 'Admin' }, { value: 'Staff', label: 'Staff' }, { value: 'Viewer', label: 'Viewer' }]} />
+              <Select value={roleFilter} onChange={(v) => { setRoleFilter(v); setCurrentPage(1); }} ariaLabel="Filter by role" className="w-auto min-w-[130px]" options={[{ value: '', label: 'All Roles' }, { value: 'Owner', label: 'Owner' }, { value: 'Admin', label: 'Admin' }, { value: 'Staff', label: 'Staff' }]} />
             </div>
           </div>
           <div className="relative w-full sm:w-64">

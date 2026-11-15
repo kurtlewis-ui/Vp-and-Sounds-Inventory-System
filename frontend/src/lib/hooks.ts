@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuthStore } from './store';
+import { roleLandingPath } from './roles';
 
 import {
   useMutation,
@@ -654,7 +655,7 @@ export function useArchivedUsers() {
 export function useRoles() {
   return useQuery({
     queryKey: ['roles'],
-    queryFn: () => getData<RoleOption[]>('/users/roles'),
+    queryFn: async () => (await getData<RoleOption[]>('/users/roles')).filter(role => roleLandingPath(role.name) !== null),
   });
 }
 
