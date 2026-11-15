@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
+import { useThemeStore } from '@/lib/theme';
 
 /**
  * Professional custom dropdown that replaces the native <select> so the OPEN
@@ -62,6 +63,7 @@ export function Select({
   id?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const contentTheme = useThemeStore(s => s.contentTheme);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [mounted, setMounted] = useState(false);
   const [drop, setDrop] = useState<'down' | 'up'>('down');
@@ -230,7 +232,7 @@ export function Select({
             role="listbox"
             id={listboxId}
             aria-activedescendant={activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined}
-            className="dropdown-pop glass fixed z-[80] max-h-72 w-max overflow-y-auto rounded-xl p-1.5 shadow-2xl shadow-black/40"
+            className={`dropdown-pop glass fixed z-[80] max-h-72 w-max overflow-y-auto rounded-xl p-1.5 text-text-primary shadow-2xl shadow-black/40 ${contentTheme === 'light' ? 'content-light' : ''}`}
             style={{
               left: pos.left,
               // At least as wide as the trigger, but allowed to grow to fit the

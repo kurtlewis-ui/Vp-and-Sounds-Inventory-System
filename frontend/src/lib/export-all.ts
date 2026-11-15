@@ -177,6 +177,6 @@ export async function exportAllData(
   XLSX.utils.book_append_sheet(wb, wsInventory, 'Inventory');
 
   // --- Download ---
-  const filename = `vape-shop-full-backup-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `vape-and-sounds-full-backup-${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(wb, filename);
 }

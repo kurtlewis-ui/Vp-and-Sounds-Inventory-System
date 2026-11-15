@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import { useThemeStore } from '@/lib/theme';
 
 // Width presets. Default 'sm' keeps the historical max-w-md so every existing
 // dialog is unchanged; wider sizes are opt-in (e.g. the Edit Sale modal, which
@@ -28,6 +29,7 @@ interface ModalProps {
 }
 
 export function Modal({ open = true, onClose, title, size = 'sm', children }: ModalProps) {
+  const contentTheme = useThemeStore(s => s.contentTheme);
   // Close on Escape key.
   useEffect(() => {
     if (!open) return;
@@ -41,7 +43,7 @@ export function Modal({ open = true, onClose, title, size = 'sm', children }: Mo
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 text-text-primary ${contentTheme === 'light' ? 'content-light' : ''}`}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div className={`glass relative w-full ${SIZE_CLASS[size]} rounded-2xl p-4 sm:p-6 shadow-2xl shadow-black/40 max-h-[90vh] overflow-y-auto`}>
         <div className="mb-4 flex items-center justify-between gap-4">

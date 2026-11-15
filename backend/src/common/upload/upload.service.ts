@@ -58,7 +58,7 @@ export class UploadService {
    */
   async uploadDataUrl(
     value: string | null | undefined,
-    folder = 'chx',
+    folder = 'vape-and-sounds',
   ): Promise<string | null | undefined> {
     // Nothing to do for empty values — preserve null vs '' vs undefined so the
     // caller's existing "clear the image" logic keeps working.
