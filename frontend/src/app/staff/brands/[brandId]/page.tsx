@@ -369,16 +369,21 @@ function AddPurchaseModal({
         </div>
 
         <div className="space-y-5" onInput={() => setDirty(true)}>
-        {needsOption && <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">{parentProduct.variantType === 'FLAVOR' ? 'Flavor' : 'Color'}
-          <select aria-label="Choose flavor or color" value={selectedOptionId} onChange={e => { setSelectedOptionId(e.target.value); setQuantity('1'); setDirty(true); }} className="h-11 w-full rounded-lg border border-input-border bg-input-bg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-input-focus">
-            <option value="">{parentProduct.variantType === 'FLAVOR' ? 'Select flavor' : 'Select color'}</option>
-            {(parentProduct.options ?? []).filter(o => !o.deletedAt).map(o => {
+        {needsOption && <div className="space-y-2">
+          <label htmlFor="purchase-option" className="block text-sm font-medium text-text-primary">{parentProduct.variantType === 'FLAVOR' ? 'Flavor' : 'Color'}</label>
+          <Select
+            id="purchase-option"
+            ariaLabel="Choose flavor or color"
+            value={selectedOptionId}
+            placeholder={parentProduct.variantType === 'FLAVOR' ? 'Select flavor' : 'Select color'}
+            onChange={value => { setSelectedOptionId(value); setQuantity('1'); setError(null); setDirty(true); }}
+            options={(parentProduct.options ?? []).filter(o => !o.deletedAt && !o.quantities?.[0]?.archivedAt).map(o => {
               const staged = draftItems.filter(i => i.productId === o.id).reduce((sum, i) => sum + i.quantity, 0) + draftDisposalItems.filter(i => i.productId === o.id).reduce((sum, i) => sum + i.quantity, 0);
               const remaining = Math.max(0, o.totalQuantity - staged);
-              return <option key={o.id} value={o.id} disabled={!remaining}>{o.optionName} — {remaining} available</option>;
+              return { value: o.id, label: `${o.optionName} — ${remaining} available`, disabled: !remaining };
             })}
-          </select>
-        </label>}
+          />
+        </div>}
 
           {/* Quantity */}
           <div>
