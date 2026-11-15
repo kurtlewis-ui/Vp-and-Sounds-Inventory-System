@@ -411,9 +411,8 @@ export default function SalesPendingPage() {
         <div className="bg-card-bg rounded-xl border border-card-border shadow-sm mb-4">
           <div className="p-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Today (Approved)</p>
-            {/* Admin: 4 columns (no Net) and disposals valued at selling price.
-                Owner: 5 columns incl. Net, disposals at cost (Disposal Losses). */}
-            <div className={`grid grid-cols-2 ${isAdmin ? 'sm:grid-cols-4' : 'sm:grid-cols-5'} gap-3 text-center`}>
+            {/* Both roles show Net; disposal valuation is cost for Owner, selling for Admin. */}
+            <div className={`grid grid-cols-2 sm:grid-cols-5 gap-3 text-center`}>
               <div>
                 <p className="text-xs text-text-secondary">Total Gross Sales</p>
                 <p className="text-lg font-bold tabular-nums break-words" style={{ color: '#10b981' }}>{peso(branchSummary.totalGrossSales)}</p>
@@ -430,9 +429,9 @@ export default function SalesPendingPage() {
                 <p className="text-xs text-text-secondary">Total Disposals</p>
                 <p className="text-lg font-bold tabular-nums break-words" style={{ color: '#f97316' }}>{peso(isAdmin ? branchSummary.totalDisposalsSelling : branchSummary.totalDisposals)}</p>
               </div>
-              {!isAdmin && (
+              {(
                 <div>
-                  <p className="text-xs text-text-secondary">Net</p>
+                  <p className="text-xs text-text-secondary">{isAdmin ? 'Net Total' : 'Net'}</p>
                   <p className="text-lg font-bold tabular-nums break-words" style={{ color: branchSummary.net >= 0 ? '#3b82f6' : '#ef4444' }}>{peso(branchSummary.net)}</p>
                 </div>
               )}

@@ -27,7 +27,7 @@ export class DisposalsService {
     const product = await this.prisma.product.findFirst({
       // Block archived products AND products from an archived brand.
       where: { id: dto.productId, variantType: 'NONE', deletedAt: null, brand: { deletedAt: null }, OR: [{ parentId: null }, { parent: { deletedAt: null, inventory: { some: { branchId, archivedAt: null } } } }] },
-      include: { brand: { select: { name: true } } },
+      include: { brand: { select: { name: true } }, parent: { select: { sellingPrice: true } } },
     });
     if (!product) {
       throw new NotFoundException('Product not found');
@@ -37,8 +37,6 @@ export class DisposalsService {
     // selling price — you never realized the sale. So value the write-off at
     // the product's cost price. This snapshots the cost at disposal time onto
     // the row (unitPrice/value), so later cost changes don't rewrite history.
-    // Every consumer (P&L "Disposal Losses", branch/sales summaries, the
-    // "Most Disposed" chart) reads this stored value, so they all follow.
     const unitPrice = new Prisma.Decimal(product.costPrice);
     const value = unitPrice.mul(dto.quantity);
 
@@ -47,6 +45,13 @@ export class DisposalsService {
         tx, branchId, product.id, product.name, dto.quantity,
       );
 
+      // Snapshot branch selling value separately so price edits cannot rewrite history.
+      const priceInventory = await tx.inventory.findUnique({
+        where: { productId_branchId: { productId: product.parentId ?? product.id, branchId } },
+        select: { sellingPrice: true },
+      });
+      const sellingUnit = priceInventory?.sellingPrice ?? product.parent?.sellingPrice ?? product.sellingPrice;
+      const sellingValue = new Prisma.Decimal(sellingUnit).mul(dto.quantity);
       const created = await tx.disposal.create({
         data: {
           branchId,
@@ -56,6 +61,7 @@ export class DisposalsService {
           quantity: dto.quantity,
           unitPrice,
           value,
+          sellingValue,
           reason: dto.reason?.trim() || null,
           status: DisposalStatus.PENDING,
           createdById: actor.userId,
@@ -94,7 +100,7 @@ export class DisposalsService {
       return created;
     });
 
-    return this.serialize(disposal);
+    return this.serialize(disposal, actor.role);
   }
 
   /**
@@ -161,7 +167,7 @@ export class DisposalsService {
         },
       });
 
-      return this.serialize(updated!);
+      return this.serialize(updated!, actor.role);
     });
   }
 
@@ -237,7 +243,7 @@ export class DisposalsService {
         },
       });
 
-      return this.serialize(updated!);
+      return this.serialize(updated!, actor.role);
     });
   }
 
@@ -381,11 +387,11 @@ export class DisposalsService {
         skip,
         take: limit,
       }),
-      this.prisma.disposal.aggregate({ where, _sum: { value: true, quantity: true } }),
+      this.prisma.disposal.aggregate({ where, _sum: { ...(actor.role === 'Owner' ? { value: true as const } : {}), sellingValue: true, quantity: true } }),
     ]);
 
     return {
-      data: disposals.map((d) => this.serialize(d)),
+      data: disposals.map((d) => this.serialize(d, actor.role)),
       pagination: {
         page,
         limit,
@@ -395,7 +401,7 @@ export class DisposalsService {
         hasPrev: page > 1,
       },
       summary: {
-        totalValue: Number(agg._sum.value ?? 0),
+        totalValue: Number((actor.role === 'Owner' ? agg._sum.value : agg._sum.sellingValue) ?? 0),
         totalQuantity: agg._sum.quantity ?? 0,
         count: total,
       },
@@ -437,44 +443,15 @@ export class DisposalsService {
   private includeFull() {
     return {
       branch: { select: { id: true, name: true } },
-      // Include the product's default selling price AND this disposal's branch
-      // inventory row, so serialize() can expose a SELLING-price valuation
-      // (`sellingValue`) for staff. The disposal's own `value` stays cost-based
-      // for the Owner's P&L — selling price is only used for the extra field.
-      product: {
-        select: {
-          id: true,
-          name: true,
-          image: true,
-          sellingPrice: true,
-          inventory: { select: { branchId: true, sellingPrice: true } },
-        },
-      },
+      product: { select: { id: true, name: true, image: true } },
       createdBy: { select: { id: true, firstName: true, lastName: true } },
       decidedBy: { select: { firstName: true, lastName: true } },
     } satisfies Prisma.DisposalInclude;
   }
 
-  /**
-   * Selling-price valuation of a disposal (quantity × the branch's selling
-   * price, falling back to the product's default). Used only for the
-   * `sellingValue` field that staff see — the stored `value` stays cost-based
-   * for the Owner's financials. Returns 0 when the product no longer exists.
-   */
-  private sellingValueFor(d: any): number {
-    const product = d.product;
-    if (!product) return 0;
-    const branchInv = (product.inventory ?? []).find(
-      (inv: any) => inv.branchId === d.branchId,
-    );
-    const unit =
-      branchInv?.sellingPrice != null
-        ? Number(branchInv.sellingPrice)
-        : Number(product.sellingPrice ?? 0);
-    return unit * d.quantity;
-  }
-
-  private serialize(d: any) {
+  private serialize(d: any, role: string) {
+    const sellingValue = Number(d.sellingValue ?? 0);
+    const owner = role === 'Owner';
     return {
       id: d.id,
       branch: d.branch ? { id: d.branch.id, name: d.branch.name } : null,
@@ -482,14 +459,10 @@ export class DisposalsService {
       name: d.productName,
       brandName: d.brandName,
       quantity: d.quantity,
-      unitPrice: Number(d.unitPrice),
-      // Cost-based value (snapshotted at disposal time). Confidential — used by
-      // the Owner's P&L / summaries / charts. NOT shown to staff.
-      value: Number(d.value),
-      // SELLING-price valuation for staff-facing views (never exposes cost).
-      // Prefers the disposal branch's own inventory price, falling back to the
-      // product's default selling price; 0 if the product was deleted.
-      sellingValue: this.sellingValueFor(d),
+      unitPrice: owner ? Number(d.unitPrice) : (d.quantity ? sellingValue / d.quantity : 0),
+      // Non-Owners never receive cost, including mutation responses.
+      value: owner ? Number(d.value) : sellingValue,
+      sellingValue,
       reason: d.reason,
       status: d.status,
       createdBy: d.createdBy

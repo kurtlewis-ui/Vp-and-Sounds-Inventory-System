@@ -8,7 +8,7 @@ import { Select } from "./Select";
 import { OptionArchiveAction } from "./OptionArchiveAction";
 
 export function OptionArchivePage({ scope }: { scope: "global" | "branch" }) {
-  const owner = useAuthStore((s) => s.user?.role?.name === "Owner");
+  const canManage = useAuthStore((s) => ["Owner", "Admin"].includes(s.user?.role?.name ?? ""));
   const [branchId, setBranchId] = useState("");
   const [branchSearch, setBranchSearch] = useState("");
   const [search, setSearch] = useState("");
@@ -36,8 +36,8 @@ export function OptionArchivePage({ scope }: { scope: "global" | "branch" }) {
       : "Branch Flavor/Color Archive";
   const date = (value: string | null) =>
     value ? new Date(value).toLocaleString() : "—";
-  if (!owner)
-    return <p className="p-6">This archive is available to the Owner.</p>;
+  if (!canManage)
+    return <p className="p-6">This archive is available to the Owner and Admin.</p>;
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold">{title}</h1>

@@ -1367,8 +1367,8 @@ export interface OptionArchiveEntry {
 }
 
 export function useOptionArchives(params: { scope: 'global' | 'branch'; branchId?: string; search?: string; page: number }) {
-  const owner = useAuthStore(s => s.user?.role?.name === 'Owner');
-  return useQuery({ queryKey: ['option-archives', params], enabled: owner,
+  const canManage = useAuthStore(s => ['Owner', 'Admin'].includes(s.user?.role?.name ?? ''));
+  return useQuery({ queryKey: ['option-archives', params], enabled: canManage,
     queryFn: () => getList<OptionArchiveEntry>('/products/option-archives', { ...params, limit: 20 }) });
 }
 

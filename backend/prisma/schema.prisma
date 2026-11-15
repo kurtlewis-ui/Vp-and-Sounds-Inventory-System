@@ -492,6 +492,8 @@ model Disposal {
   // Per-unit price snapshot + total value written off (PHP).
   unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
   value       Decimal  @db.Decimal(12, 2)
+  // Selling-price write-off snapshot for Admin/Staff; never exposes cost.
+  sellingValue Decimal @default(0) @map("selling_value") @db.Decimal(12, 2)
   reason      String?  @db.Text
   // Disposals are requested then approved/declined by an Admin. Stock is
   // reserved (deducted) immediately on request, and restored if declined or

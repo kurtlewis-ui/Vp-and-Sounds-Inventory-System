@@ -16,8 +16,8 @@ function fixture() {
 }
 
 describe('Flavor/color archive scopes', () => {
-  it.each(['archiveOption', 'restoreOption', 'optionArchives'])('keeps %s Owner-only', method => {
-    expect(Reflect.getMetadata(ROLES_KEY, (ProductsController.prototype as any)[method])).toEqual(['Owner']);
+  it.each(['archiveOption', 'restoreOption', 'optionArchives'])('allows Owner/Admin but excludes Staff for %s', method => {
+    expect(Reflect.getMetadata(ROLES_KEY, (ProductsController.prototype as any)[method])).toEqual(['Owner', 'Admin']);
   });
 
   it('archives an option with retained stock in one branch without changing quantity or global status', async () => {

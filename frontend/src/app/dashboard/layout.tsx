@@ -64,14 +64,9 @@ const ownerNavItems: NavItem[] = [
   },
 ];
 
-// Admin is a reviewer/approver: it sees most of what the Owner sees, but the
-// pages themselves render read-only (no create/edit/restock/delete) and never
-// expose cost. The only actions Admin performs are approving/declining pending
-// sales, disposals and expenses, plus managing Staff accounts + branch
-// assignments, and archiving/restoring Staff. Cost-derived pages (Profit &
-// Loss) are omitted; Archive is limited to Staff.
+// Admin shares navigation, with cost-free analytics and Staff-only account management.
 const adminNavItems: NavItem[] = [
-  // Admin has NO Dashboard page (removed) — Admin lands on Sales → Pending.
+  { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} /> },
   { label: 'Shops', href: '/dashboard/shops', icon: <Store size={18} /> },
   { label: 'Brands', href: '/dashboard/brands', icon: <Tag size={18} /> },
   { label: 'Products', href: '/dashboard/products', icon: <Package size={18} /> },
@@ -79,10 +74,10 @@ const adminNavItems: NavItem[] = [
     label: 'Sales',
     href: '/dashboard/sales',
     icon: <PhilippinePeso size={18} />,
-    // No Disposals sub-item for Admin — that page is removed for Admin.
     dropdown: [
       { label: 'Records', href: '/dashboard/sales/records' },
       { label: 'Pending', href: '/dashboard/sales/pending' },
+      { label: 'Disposals', href: '/dashboard/sales/disposals' },
     ],
   },
   { label: 'Staff', href: '/dashboard/users', icon: <Users size={18} /> },
@@ -95,16 +90,14 @@ const adminNavItems: NavItem[] = [
     href: '/dashboard/archive',
     icon: <Archive size={18} />,
     dropdown: [
-      // Ordered by domain, parent before child: people, locations, then the
-      // catalog (Brands → Products → per-branch Products).
-      // Each global archive sits next to its per-branch version:
-      // Staff -> Shops -> Brands (+ Branch Brand) -> Products (+ Branch Product).
-      { label: 'Staff Archive', href: '/dashboard/archive/users' },
-      { label: 'Shops Archive', href: '/dashboard/archive/shops' },
-      { label: 'Brands Archive', href: '/dashboard/archive/brands' },
-      { label: 'Branch Brand Archive', href: '/dashboard/archive/branch-brands' },
-      { label: 'Products Archive', href: '/dashboard/archive/products' },
-      { label: 'Branch Product Archive', href: '/dashboard/archive/branch-products' },
+      { label: 'Staff', href: '/dashboard/archive/users', group: 'General Archives' },
+      { label: 'Shops', href: '/dashboard/archive/shops', group: 'General Archives' },
+      { label: 'Brands', href: '/dashboard/archive/brands', group: 'General Archives' },
+      { label: 'Products', href: '/dashboard/archive/products', group: 'General Archives' },
+      { label: 'Flavors / Colors', href: '/dashboard/archive/options', group: 'General Archives' },
+      { label: 'Brands', href: '/dashboard/archive/branch-brands', group: 'Branch Archives' },
+      { label: 'Products', href: '/dashboard/archive/branch-products', group: 'Branch Archives' },
+      { label: 'Flavors / Colors', href: '/dashboard/archive/branch-options', group: 'Branch Archives' },
     ],
   },
 ];

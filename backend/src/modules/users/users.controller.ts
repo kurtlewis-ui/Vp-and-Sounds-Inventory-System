@@ -77,8 +77,8 @@ export class UsersController {
   @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'List archived (soft-deleted) users' })
   @ApiResponse({ status: 200, description: 'Archived users retrieved' })
-  async findArchived(@Query() query: QueryUserDto) {
-    const result = await this.usersService.findArchived(query);
+  async findArchived(@Query() query: QueryUserDto, @CurrentUser() user: RequestUser) {
+    const result = await this.usersService.findArchived(query, user.role);
 
     return {
       success: true,
