@@ -2,7 +2,6 @@
 import { sellableProducts } from '@/lib/product-options';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Search, Plus, X, Loader2 } from 'lucide-react';
 import { useDisposals, useCreateDisposal, useBranches, useProducts } from '@/lib/hooks';
 import { useAuthStore } from '@/lib/store';
@@ -24,14 +23,7 @@ function formatDate(iso: string) {
 }
 
 export default function DisposalsPage() {
-  // The Disposals page is removed for Admin — redirect them to their landing
-  // page if they reach this route directly. (Owner keeps full access.)
-  const isAdmin = useAuthStore((s) => s.user?.role?.name === 'Admin');
-  const router = useRouter();
-  useEffect(() => {
-    if (isAdmin) router.replace('/dashboard/sales/pending');
-  }, [isAdmin, router]);
-
+  const isOwner = useAuthStore((s) => s.user?.role?.name === 'Owner');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -62,16 +54,14 @@ export default function DisposalsPage() {
   };
   const { pageItems: pagedDisposals, resetPage, controlProps } = usePagination(disposals, 10);
 
-  // Admin is redirected away (above) — render nothing while that happens.
-  if (isAdmin) return null;
 
   return (
     <div className="p-6 min-h-screen">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold text-text-primary">Disposals</h1>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 btn-grad px-4 py-2 rounded-lg text-sm font-medium">
+        {isOwner && <button onClick={() => setShowModal(true)} className="flex items-center gap-2 btn-grad px-4 py-2 rounded-lg text-sm font-medium">
           <Plus size={16} /> Request Disposal
-        </button>
+        </button>}
       </div>
       <p className="text-sm text-text-muted mb-6">Approved disposals (stock that has been written off). New requests go to <strong>Sales → Pending</strong> for approval.</p>
 

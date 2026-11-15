@@ -471,11 +471,11 @@ export class UsersService {
     return { message: 'User deleted successfully' };
   }
 
-  async findArchived(query: QueryUserDto) {
+  async findArchived(query: QueryUserDto, actorRole: string) {
     const { page = 1, limit = 20, search } = query;
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: { not: null } };
+    const where: any = { deletedAt: { not: null }, ...(actorRole === 'Owner' ? {} : { role: { name: 'Staff' } }) };
 
     if (search) {
       where.OR = [

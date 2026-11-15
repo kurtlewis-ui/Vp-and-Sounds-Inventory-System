@@ -17,8 +17,8 @@ export default function UsersArchivePage() {
   const currentRole = useAuthStore((s) => s.user?.role?.name);
   const isOwner = currentRole === 'Owner';
 
-  // Admin cannot see Owner accounts in the archive
-  const users = isOwner ? allUsers : allUsers.filter((u) => u.role.name !== 'Owner');
+  // Admin manages archived Staff only, matching the backend query.
+  const users = isOwner ? allUsers : allUsers.filter((u) => u.role.name === 'Staff');
 
   const filtered = users.filter(
     (u) =>
@@ -34,7 +34,7 @@ export default function UsersArchivePage() {
 
   return (
     <div className="p-6 min-h-screen">
-      <h1 className="text-2xl font-bold text-text-primary mb-6">Users Archive</h1>
+      <h1 className="text-2xl font-bold text-text-primary mb-6">{isOwner ? 'Users Archive' : 'Staff Archive'}</h1>
       {actionError && <div className="mb-4 rounded-lg bg-accent-red/10 border border-accent-red/30 px-4 py-2 text-sm text-accent-red">{actionError}</div>}
 
       <div className="bg-card-bg rounded-xl border border-card-border shadow-sm">

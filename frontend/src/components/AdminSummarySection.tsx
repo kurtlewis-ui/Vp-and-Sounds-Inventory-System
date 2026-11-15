@@ -50,7 +50,7 @@ function quickRangeDates(range: QuickRange): { start: string; end: string } {
 /**
  * Admin-only sales summary section on the dashboard. It mirrors the Owner's
  * Profit & Loss layout but shows ONLY the cost-free figures an Admin may see:
- * Total Sales, Total Discount, Total Expenses, Disposal Losses and Net Total.
+ * Total Gross Sales, Total Expenses, Total Disposal, Total Discount and Net Total.
  *
  * It uses the /stats/sales-summary endpoint (Owner+Admin), which computes NO
  * cost-derived values (no Capital/COGS, Gross Profit, Net Profit or Margin), so
@@ -87,7 +87,7 @@ function SummaryContent() {
   });
 
   const metrics = {
-    totalSales: summary?.totalSales ?? 0,
+    totalGrossSales: summary?.totalGrossSales ?? 0,
     totalDiscount: summary?.totalDiscount ?? 0,
     totalExpenses: summary?.totalExpenses ?? 0,
     disposalLosses: summary?.disposalLosses ?? 0,
@@ -168,29 +168,21 @@ function SummaryContent() {
         </div>
       </div>
 
-      {/* 5 cost-free metrics: 2-up on phones, single row from lg up. */}
       <div className="border-t border-card-border pt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-5 gap-y-4 text-center">
-        <div className="px-1 min-w-0">
-          <p className="text-xs text-text-muted uppercase">Total Sales</p>
-          <p className="text-base sm:text-xl font-bold tabular-nums leading-tight break-words" style={{ color: '#10b981' }}>{peso(metrics.totalSales)}</p>
-        </div>
-        <div className="px-1 min-w-0">
-          <p className="text-xs text-text-muted uppercase">Total Discount</p>
-          <p className="text-base sm:text-xl font-bold tabular-nums leading-tight break-words" style={{ color: '#ec4899' }}>{peso(metrics.totalDiscount)}</p>
-        </div>
-        <div className="px-1 min-w-0">
-          <p className="text-xs text-text-muted uppercase">Expenses</p>
-          <p className="text-base sm:text-xl font-bold tabular-nums leading-tight break-words" style={{ color: '#ef4444' }}>{peso(metrics.totalExpenses)}</p>
-        </div>
-        <div className="px-1 min-w-0">
-          <p className="text-xs text-text-muted uppercase">Disposal Losses</p>
-          <p className="text-base sm:text-xl font-bold tabular-nums leading-tight break-words" style={{ color: '#f59e0b' }}>{peso(metrics.disposalLosses)}</p>
-        </div>
-        <div className="px-1 min-w-0">
-          <p className="text-xs text-text-muted uppercase">Net Total</p>
-          <p className="text-base sm:text-xl font-bold tabular-nums leading-tight break-words" style={{ color: metrics.net >= 0 ? '#a78bfa' : '#ef4444' }}>{peso(metrics.net)}</p>
-        </div>
+        {[
+          { label: 'Total Gross Sales', value: metrics.totalGrossSales, color: 'text-accent-green' },
+          { label: 'Total Expenses', value: metrics.totalExpenses, color: 'text-accent-red' },
+          { label: 'Total Disposal', value: metrics.disposalLosses, color: 'text-accent-orange' },
+          { label: 'Total Discount', value: metrics.totalDiscount, color: 'text-accent-blue' },
+          { label: 'Net Total', value: metrics.net, color: metrics.net >= 0 ? 'text-accent-purple' : 'text-accent-red' },
+        ].map(metric => (
+          <div key={metric.label} className="px-1 min-w-0">
+            <p className="text-xs text-text-muted uppercase">{metric.label}</p>
+            <p className={`text-base sm:text-xl font-bold tabular-nums leading-tight break-words ${metric.color}`}>{peso(metric.value)}</p>
+          </div>
+        ))}
       </div>
+      <p className="mt-4 text-xs text-text-muted">Net Total = Gross Sales − Expenses − Disposal (selling price) − Discount.</p>
     </div>
   );
 }

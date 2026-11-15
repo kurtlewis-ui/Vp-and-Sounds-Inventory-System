@@ -193,4 +193,12 @@ describe('UsersService — permissions', () => {
       expect(whereArg.role).toBeUndefined();
     });
   });
+  it.each(['Owner', 'Admin'])('%s archive query restricts account visibility before pagination', async role => {
+    prisma.user.count = jest.fn().mockResolvedValue(0);
+    prisma.user.findMany = jest.fn().mockResolvedValue([]);
+    await service.findArchived({} as any, role);
+    const where = prisma.user.findMany.mock.calls[0][0].where;
+    expect(where.role).toEqual(role === 'Owner' ? undefined : { name: 'Staff' });
+    expect(prisma.user.count).toHaveBeenCalledWith({ where });
+  });
 });

@@ -272,7 +272,7 @@ export class StatsService {
       ? { branchId: resolvedBranchId, status: DisposalStatus.PENDING }
       : { branchId: resolvedBranchId, status: DisposalStatus.APPROVED, decidedAt: { gte: start } };
 
-    const [salesAgg, expensesAgg, disposalsAgg, discountAgg, paymentItems, disposalRows] = await Promise.all([
+    const [salesAgg, expensesAgg, disposalsAgg, discountAgg, paymentItems] = await Promise.all([
       this.prisma.sale.aggregate({
         where: saleWhere,
         _sum: { total: true },
@@ -285,7 +285,7 @@ export class StatsService {
       // alongside expenses. (Pending for staff; approved-today for owner/admin.)
       this.prisma.disposal.aggregate({
         where: disposalWhere,
-        _sum: { value: true },
+        _sum: { ...(actor.role === 'Owner' ? { value: true as const } : {}), sellingValue: true },
       }),
       // Total Discount (DISPLAY only). Summed from the sale items whose parent
       // sale is in scope. totalSales already uses Sale.total (= Σ subTotal, net
@@ -302,44 +302,14 @@ export class StatsService {
         where: { sale: saleWhere },
         select: { paymentMethod: true, subTotal: true, paymentSplit: true },
       }),
-      // In-scope disposal rows (productId + qty) so we can also value them at
-      // the product's SELLING price — the Admin's strip shows disposals at
-      // selling price, while Disposal.value stays cost-based for the Owner's
-      // P&L. Uses the product's CURRENT selling price.
-      this.prisma.disposal.findMany({
-        where: disposalWhere,
-        select: { productId: true, quantity: true },
-      }),
     ]);
 
-    // Value today's disposals at the products' CURRENT selling price for the
-    // Admin Today strip (totalDisposals below stays cost-based for the Owner).
-    // Look up selling prices for the disposed products in one query, then sum
-    // sellingPrice × quantity. Disposals of a deleted product (productId null)
-    // contribute 0 to this selling-price figure.
-    const disposalProductIds = Array.from(
-      new Set(disposalRows.map((d) => d.productId).filter((id): id is string => !!id)),
-    );
-    const disposalProducts = disposalProductIds.length
-      ? await this.prisma.product.findMany({
-          where: { id: { in: disposalProductIds } },
-          select: { id: true, sellingPrice: true },
-        })
-      : [];
-    const sellingPriceById = new Map(
-      disposalProducts.map((p) => [p.id, Number(p.sellingPrice)]),
-    );
-    let totalDisposalsSelling = 0;
-    for (const d of disposalRows) {
-      if (d.productId && sellingPriceById.has(d.productId)) {
-        totalDisposalsSelling += sellingPriceById.get(d.productId)! * d.quantity;
-      }
-    }
+    const totalDisposalsSelling = Number(disposalsAgg._sum.sellingValue ?? 0);
 
     // `totalSales` here is the NET (Σ Sale.total, already after discount).
     const totalSales = Number(salesAgg._sum.total ?? 0);
     const totalExpenses = Number(expensesAgg._sum.amount ?? 0);
-    const totalDisposals = Number(disposalsAgg._sum.value ?? 0);
+    const totalDisposals = actor.role === 'Owner' ? Number(disposalsAgg._sum.value ?? 0) : totalDisposalsSelling;
     const totalDiscount = Number(discountAgg._sum.discount ?? 0);
     // Gross sales = net + discount = Σ(unitPrice × qty) before any discount.
     // Derived (no extra query) so Gross − Discount = Net reconciles exactly.
@@ -375,8 +345,7 @@ export class StatsService {
       totalSales,
       totalExpenses,
       totalDisposals,
-      // Selling-price valuation of today's disposals — used by the Admin Today
-      // strip only. `totalDisposals` above stays cost-based (Owner P&L).
+      // Shared selling snapshot; totalDisposals/net use the caller's permitted valuation.
       totalDisposalsSelling,
       totalDiscount,
       cash,
@@ -503,7 +472,7 @@ export class StatsService {
    *   totalDiscount   = Σ SaleItem.discount              (display only)
    *   totalGrossSales = totalSales + totalDiscount       (before discount)
    *   totalExpenses   = Σ Expense.amount   (APPROVED, same range/branch)
-   *   disposalLosses  = Σ Disposal.value   (APPROVED, same range/branch)
+   *   disposalLosses  = Σ Disposal.sellingValue (APPROVED, same range/branch)
    *   net             = totalSales − totalExpenses − disposalLosses
    *
    * Date filtering mirrors profitSummary/the Sales Records list: APPROVED sales
@@ -542,7 +511,7 @@ export class StatsService {
           ...(branchId ? { branchId } : {}),
           ...(hasDateFilter ? { createdAt: dateRange } : {}),
         },
-        _sum: { value: true },
+        _sum: { sellingValue: true },
       }),
     ]);
 
@@ -550,7 +519,7 @@ export class StatsService {
     const totalDiscount = Number(itemAgg._sum.discount ?? 0);
     const totalGrossSales = totalSales + totalDiscount;
     const totalExpenses = Number(expenseAgg._sum.amount ?? 0);
-    const disposalLosses = Number(disposalAgg._sum.value ?? 0);
+    const disposalLosses = Number(disposalAgg._sum.sellingValue ?? 0);
     const net = totalSales - totalExpenses - disposalLosses;
 
     return {

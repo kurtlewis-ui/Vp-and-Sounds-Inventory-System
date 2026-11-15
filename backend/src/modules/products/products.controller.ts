@@ -97,19 +97,19 @@ export class ProductsController {
   }
 
   @Get('option-archives')
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   async optionArchives(@Query() query: QueryOptionArchiveDto) {
     return { success: true, ...await this.productsService.optionArchives(query) };
   }
 
   @Post('options/:id/archive')
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   async archiveOption(@Param('id', ParseUUIDPipe) id: string, @Body() dto: OptionArchiveDto, @CurrentUser() user: RequestUser) {
     return { success: true, data: await this.productsService.archiveOption(id, user.userId, false, dto.branchId) };
   }
 
   @Post('options/:id/restore')
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   async restoreOption(@Param('id', ParseUUIDPipe) id: string, @Body() dto: OptionArchiveDto, @CurrentUser() user: RequestUser) {
     return { success: true, data: await this.productsService.archiveOption(id, user.userId, true, dto.branchId) };
   }
