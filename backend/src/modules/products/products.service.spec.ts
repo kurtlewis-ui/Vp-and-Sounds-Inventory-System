@@ -1,12 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ProductsService } from './products.service';
+import * as optionWriter from './product-options';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UploadService } from '../../common/upload/upload.service';
 
 /**
  * Unit tests for ProductsService core rules: create/update guards, the
- * Admin-is-image-only restriction, global archive/restore, per-branch archive
+ * Admin cost confidentiality, global archive/restore, per-branch archive
  * (remove/restore from one shop), and cost-price confidentiality in the
  * serialized output. Mocked Prisma + Upload — no database.
  */
@@ -21,6 +22,7 @@ describe('ProductsService — core & per-branch archive', () => {
   // A fully-populated product row as returned by includeFull()/selectFull().
   function productRow(overrides: Partial<any> = {}) {
     return {
+      variantType: 'NONE', parentId: null,
       id: PRODUCT_ID,
       name: 'Blue Razz',
       slug: 'blue-razz',
@@ -65,14 +67,14 @@ describe('ProductsService — core & per-branch archive', () => {
     prisma = module.get(PrismaService);
   });
 
-  it('applies an All Shops price to ordinary products without overwriting a newer stock count', async () => {
+  it.each(['Owner', 'Admin'])('%s applies All Shops pricing without overwriting a newer stock count', async role => {
     prisma.product.findFirst.mockResolvedValue(productRow({ variantType: 'NONE', parentId: null }));
     prisma.product.findUnique.mockResolvedValue(productRow());
     prisma.branch.count.mockResolvedValue(1);
     prisma.inventory.findMany = jest.fn().mockResolvedValue([{ branchId: BRANCH_ID, quantity: 9 }]);
     prisma.inventory.updateMany = jest.fn();
     await service.update(PRODUCT_ID, { sellingPrice: 700, applyPriceToAllBranches: true,
-      quantities: [{ branchId: BRANCH_ID, quantity: 10, expectedQuantity: 10, sellingPrice: 700 }] }, USER, 'Owner');
+      quantities: [{ branchId: BRANCH_ID, quantity: 10, expectedQuantity: 10, sellingPrice: 700 }] }, USER, role);
     expect(prisma.inventory.upsert.mock.calls[0][0].update).toEqual({});
     expect(prisma.inventory.updateMany).toHaveBeenCalledWith({ where: { productId: PRODUCT_ID }, data: { sellingPrice: 700 } });
     expect(prisma.stockMovement.create).not.toHaveBeenCalled();
@@ -98,26 +100,35 @@ describe('ProductsService — core & per-branch archive', () => {
     });
   });
 
-  // ---- update (Admin is image-only) ---------------------------------------
-  describe('update — Admin image-only', () => {
-    it('ignores every non-image field when the actor is Admin', async () => {
+  it('does not pass forged Admin cost into flavor/color persistence', async () => {
+    const save = jest.spyOn(optionWriter, 'saveProductOptions').mockResolvedValue(PRODUCT_ID);
+    try {
+      prisma.product.findFirst.mockResolvedValue(productRow({ variantType: 'FLAVOR' }));
+      await service.update(PRODUCT_ID, { name: 'Updated', costPrice: 999 } as any, 'admin', 'Admin');
+      expect(save.mock.calls[0][1]).not.toHaveProperty('costPrice');
+      expect(save.mock.calls[0][1]).toHaveProperty('name', 'Updated');
+    } finally { save.mockRestore(); }
+  });
+
+  // ---- update (shared operations, private cost) ---------------------------------------
+  describe('update — Admin operations', () => {
+    it('allows Admin metadata and selling-price edits while stripping forged cost', async () => {
       prisma.product.findFirst.mockResolvedValue(productRow());
-      prisma.product.update.mockResolvedValue(productRow());
       prisma.product.findUnique.mockResolvedValue(productRow());
+      const result = await service.update(PRODUCT_ID, { name: 'Updated', sellingPrice: 150, costPrice: 1, quantityAlert: 9, image: 'image' } as any, 'admin-1', 'Admin');
+      const data = prisma.product.update.mock.calls[0][0].data;
+      expect(data).toMatchObject({ name: 'Updated', sellingPrice: 150, quantityAlert: 9, image: 'image' });
+      expect(data).not.toHaveProperty('costPrice');
+      expect(result).not.toHaveProperty('costPrice');
+    });
 
-      await service.update(
-        PRODUCT_ID,
-        { name: 'HACKED', sellingPrice: 1, costPrice: 1, quantityAlert: 99, image: 'data:img', quantities: [{ branchId: BRANCH_ID, quantity: 500 }] } as any,
-        'admin-1',
-        'Admin',
-      );
-
-      // Only `image` is written; name/price/cost/quantityAlert never reach the DB.
-      const updateData = prisma.product.update.mock.calls[0][0].data;
-      expect(Object.keys(updateData)).toEqual(['image']);
-      expect(updateData.name).toBeUndefined();
-      expect(updateData.sellingPrice).toBeUndefined();
-      expect(updateData.costPrice).toBeUndefined();
+    it('strips forged cost on Admin product creation', async () => {
+      prisma.brand.findFirst.mockResolvedValue({ id: 'b1', name: 'Brand' });
+      prisma.product.aggregate.mockResolvedValue({ _max: { sortOrder: 0 } });
+      prisma.product.create.mockResolvedValue(productRow());
+      const result = await service.create({ name: 'New', brandId: 'b1', sellingPrice: 150, costPrice: 999 } as any, 'admin-1', 'Admin');
+      expect(prisma.product.create.mock.calls[0][0].data.costPrice).toBe(0);
+      expect(result).not.toHaveProperty('costPrice');
     });
 
     it('rejects (brand not found) for an Owner editing with a bad brandId', async () => {

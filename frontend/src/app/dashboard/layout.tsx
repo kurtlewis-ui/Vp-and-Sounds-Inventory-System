@@ -64,7 +64,7 @@ const ownerNavItems: NavItem[] = [
   },
 ];
 
-// Admin shares navigation, with cost-free analytics and Staff-only account management.
+// Admin shares navigation, with cost-free analytics and Admin/Staff account management.
 const adminNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} /> },
   { label: 'Shops', href: '/dashboard/shops', icon: <Store size={18} /> },
@@ -80,17 +80,15 @@ const adminNavItems: NavItem[] = [
       { label: 'Disposals', href: '/dashboard/sales/disposals' },
     ],
   },
-  { label: 'Staff', href: '/dashboard/users', icon: <Users size={18} /> },
+  { label: 'Users', href: '/dashboard/users', icon: <Users size={18} /> },
   { label: 'Activity Logs', href: '/dashboard/activity-logs', icon: <ClipboardList size={18} /> },
-  // Admin can archive/restore Staff, Shops, Brands and Products (archive +
-  // photo were opened up to Admin). The archived-users page already hides Owner
-  // accounts from non-Owners, so it shows just archived Staff for an Admin.
+  // Owner accounts stay hidden from Admin, including archives.
   {
     label: 'Archive',
     href: '/dashboard/archive',
     icon: <Archive size={18} />,
     dropdown: [
-      { label: 'Staff', href: '/dashboard/archive/users', group: 'General Archives' },
+      { label: 'Users', href: '/dashboard/archive/users', group: 'General Archives' },
       { label: 'Shops', href: '/dashboard/archive/shops', group: 'General Archives' },
       { label: 'Brands', href: '/dashboard/archive/brands', group: 'General Archives' },
       { label: 'Products', href: '/dashboard/archive/products', group: 'General Archives' },

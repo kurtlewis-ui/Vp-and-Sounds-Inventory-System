@@ -66,28 +66,14 @@ export default function ProductsPage() {
   useEffect(() => {
     if (branchData && shopFilter && !branches.some(b => b.id === shopFilter)) setShopFilter('');
   }, [branchData, branches, shopFilter]);
-  // Product management (add / edit / restock / import / reorder / archive) is
-  // Owner-only — the backend enforces this too (PR: admin authorization). Admin
-  // gets a strictly READ-ONLY products page: it can view stock and open the
-  // Stock History, but every mutating control is hidden. `canManage` therefore
-  // means "is the Owner"; `isOwner` is kept as an explicit alias for the few
-  // Owner-only extras (cost price field, Reset Stock, undo).
+  // Operational controls are shared; cost fields remain Owner-only.
   const role = useAuthStore((s) => s.user?.role?.name);
   const isOwner = role === 'Owner';
-  const canManage = isOwner;
-  // Kept for readability where the old name was used to gate management UI
-  // (full add/edit/restock/reorder/reset). This is Owner-only, NOT the actual
-  // Admin role — see `isRealAdmin` below.
-  const isAdmin = canManage;
-  // The ACTUAL Admin role. Admin may ONLY archive a product and change its
-  // image (via a dedicated image-only button) — never quantity, selling price
-  // or cost (those fields are never even rendered for Admin). The backend
-  // enforces the same restriction.
   const isRealAdmin = role === 'Admin';
-  const canArchive = isOwner || isRealAdmin;
-  // Per-branch remove ("remove from this shop") is allowed for Owner + Admin,
-  // and only makes sense when a SINGLE shop is selected (not "All Shops").
-  const canRemoveFromBranch = isOwner || isRealAdmin;
+  const canManage = isOwner || isRealAdmin;
+  const isAdmin = canManage;
+  const canArchive = canManage;
+  const canRemoveFromBranch = canManage;
   const selectedBranchName = branches.find((b) => b.id === shopFilter)?.name ?? '';
 
   // Fetch the max the backend allows (200) so ALL products are available for
@@ -137,11 +123,9 @@ export default function ProductsPage() {
     }
   }
 
-  // Show a success toast for an owner that can undo the stock movements just
-  // created. Falls back to a plain success toast for non-owners or when there
-  // was nothing quantity-related to undo.
+  // Both management roles can undo the stock movements just created.
   function toastWithUndo(message: string, movementIds: string[]) {
-    if (isOwner && movementIds.length > 0) {
+    if (canManage && movementIds.length > 0) {
       toast.show('success', message, {
         action: {
           label: 'Undo',
@@ -204,8 +188,8 @@ export default function ProductsPage() {
   const { data: freshEditProduct } = useProductDetail(showEditModal ? editingProduct?.id : null);
   useEffect(() => {
     if (!showEditModal || !freshEditProduct) return;
-    if (!formDirty && freshEditProduct.costPrice != null) {
-      setFormCostPrice(freshEditProduct.costPrice.toString());
+    if (!formDirty) {
+      if (isOwner && freshEditProduct.costPrice != null) setFormCostPrice(freshEditProduct.costPrice.toString());
       setEditingProduct(freshEditProduct);
       const prices = freshEditProduct.quantities.map(q => q.sellingPrice ?? freshEditProduct.sellingPrice);
       setFormPrice(!shopFilter && new Set(prices).size > 1 ? '' : String(shopFilter ? prices[freshEditProduct.quantities.findIndex(q => q.branchId === shopFilter)] ?? freshEditProduct.sellingPrice : prices[0] ?? freshEditProduct.sellingPrice));
@@ -346,7 +330,7 @@ export default function ProductsPage() {
     if (!formBrand) { setFormError('Please select a brand.'); return; }
     setFormError(null);
     try {
-      await createProduct.mutateAsync({ name: formName.trim(), brandId: formBrand, sellingPrice: parseFloat(formPrice) || 0, costPrice: parseFloat(formCostPrice) || 0, quantityAlert: parseInt(formAlert) || 0, image: formImage ?? undefined, ...optionPayload(), quantities: buildQuantitiesPayload() });
+      await createProduct.mutateAsync({ name: formName.trim(), brandId: formBrand, sellingPrice: parseFloat(formPrice) || 0, ...(isOwner ? { costPrice: parseFloat(formCostPrice) || 0 } : {}), quantityAlert: parseInt(formAlert) || 0, image: formImage ?? undefined, ...optionPayload(), quantities: buildQuantitiesPayload() });
       setFormDirty(false); setShowAddModal(false);
     } catch (e) { setFormError(e instanceof Error && !('response' in e) ? e.message : getApiErrorMessage(e)); }
   }
@@ -361,7 +345,7 @@ export default function ProductsPage() {
       // Only send costPrice when the owner actually entered a value. Sending it
       // unconditionally would zero the stored cost on every non-owner edit (they
       // never see the field) and on owner edits that leave it blank.
-      if (formCostPrice.trim() !== '') {
+      if (isOwner && formCostPrice.trim() !== '') {
         updateData.costPrice = parseFloat(formCostPrice) || 0;
       }
       if (!shopFilter && priceDirty) {
@@ -443,7 +427,7 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      {!isOwner && optionsProduct && <Modal title={optionsProduct.name} onClose={() => setOptionsProduct(null)}><div className="space-y-3">
+      {!canManage && optionsProduct && <Modal title={optionsProduct.name} onClose={() => setOptionsProduct(null)}><div className="space-y-3">
         {(optionsProduct.options ?? []).map(o => <div key={o.id} className="border border-card-border rounded p-3">
           <strong>{o.optionName}{o.deletedAt ? ' (Archived)' : ''}</strong>
           {o.quantities.filter(q => !shopFilter || q.branchId === shopFilter).map(q => <div key={q.branchId} className="flex justify-between gap-3 text-sm py-1"><span>{q.branchName}: {q.quantity} units</span><button onClick={() => { setHistoryProduct(o); setShopFilter(q.branchId); }} className="underline">Stock history</button></div>)}
@@ -472,7 +456,7 @@ export default function ProductsPage() {
             {reorderMode ? <><Check size={14} /> Done Reordering</> : <><ArrowUpDown size={14} /> Reorder</>}
           </button>
         )}
-        {isOwner && (
+        {canManage && (
           <button
             onClick={() => { setResetConfirmText(''); setShowResetModal(true); }}
             title="Reset all product stock to 0 at every shop"
@@ -550,7 +534,7 @@ export default function ProductsPage() {
                       <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center text-[10px] text-text-muted">No Img</div>
                     )}
                   </td>
-                  <td className="px-3 py-3 align-middle text-sm text-text-primary font-medium">{product.name}{!isOwner && !!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View {product.variantType === 'FLAVOR' ? 'flavors' : 'colors'}</button>}</td>
+                  <td className="px-3 py-3 align-middle text-sm text-text-primary font-medium">{product.name}{!canManage && !!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View {product.variantType === 'FLAVOR' ? 'flavors' : 'colors'}</button>}</td>
                   <td className="px-3 py-3 text-sm">
                     {shopFilter ? (
                       (() => {
@@ -620,7 +604,7 @@ export default function ProductsPage() {
                     <div className="flex items-center justify-end gap-2">
                       {shopFilter && <button onClick={() => setHistoryProduct(product)} className="icon-btn text-text-secondary hover:bg-white/10" title="Stock History"><ClipboardList size={16} /></button>}
                       {canManage && <button onClick={() => openEditModal(product)} className="icon-btn text-accent-blue hover:bg-accent-blue/10" title="Edit"><Pencil size={16} /></button>}
-                      {isRealAdmin && <button onClick={() => openPhotoModal(product)} className="icon-btn text-accent-blue hover:bg-accent-blue/10" title="Change photo"><ImagePlus size={16} /></button>}
+                      {!canManage && isRealAdmin && <button onClick={() => openPhotoModal(product)} className="icon-btn text-accent-blue hover:bg-accent-blue/10" title="Change photo"><ImagePlus size={16} /></button>}
                       {canRemoveFromBranch && shopFilter && <button onClick={() => { setRemoveBranchProduct(product); setFormError(null); }} className="icon-btn text-accent-orange hover:bg-accent-orange/10" title={`Remove from ${selectedBranchName}`}><Store size={16} /></button>}
                       {canArchive && <button onClick={() => { setArchivingProduct(product); setFormError(null); setShowArchiveModal(true); }} className="icon-btn text-accent-archive hover:bg-accent-archive/10" title="Archive"><Archive size={16} /></button>}
                     </div>
@@ -670,14 +654,14 @@ export default function ProductsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-text-primary">
                         <span className="text-text-muted mr-1.5">{reorderMode ? i + 1 : (entriesPerPage === 'All' ? 0 : (currentPage - 1) * (entriesPerPage as number)) + i + 1}.</span>
-                        {product.name}{!isOwner && !!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View options</button>}
+                        {product.name}{!canManage && !!product.options?.length && <button onClick={() => setOptionsProduct(product)} className="block text-xs underline mt-1">View options</button>}
                       </p>
                       <p className="mt-0.5 text-xs text-text-secondary">{product.brand?.name ?? '—'}</p>
                     </div>
                     <div className="flex shrink-0 items-center">
                       {shopFilter && <button onClick={() => setHistoryProduct(product)} className="flex h-12 w-12 items-center justify-center rounded-lg text-text-secondary hover:bg-white/10 transition-colors" title="Stock History" aria-label="Stock history"><ClipboardList size={18} /></button>}
                       {canManage && <button onClick={() => openEditModal(product)} className="flex h-12 w-12 items-center justify-center rounded-lg text-accent-blue hover:bg-accent-blue/10 transition-colors" title="Edit" aria-label={`Edit ${product.name}`}><Pencil size={18} /></button>}
-                      {isRealAdmin && <button onClick={() => openPhotoModal(product)} className="flex h-12 w-12 items-center justify-center rounded-lg text-accent-blue hover:bg-accent-blue/10 transition-colors" title="Change photo" aria-label={`Change photo for ${product.name}`}><ImagePlus size={18} /></button>}
+                      {!canManage && isRealAdmin && <button onClick={() => openPhotoModal(product)} className="flex h-12 w-12 items-center justify-center rounded-lg text-accent-blue hover:bg-accent-blue/10 transition-colors" title="Change photo" aria-label={`Change photo for ${product.name}`}><ImagePlus size={18} /></button>}
                       {canRemoveFromBranch && shopFilter && <button onClick={() => { setRemoveBranchProduct(product); setFormError(null); }} className="flex h-12 w-12 items-center justify-center rounded-lg text-accent-orange hover:bg-accent-orange/10 transition-colors" title={`Remove from ${selectedBranchName}`} aria-label={`Remove ${product.name} from ${selectedBranchName}`}><Store size={18} /></button>}
                       {canArchive && <button onClick={() => { setArchivingProduct(product); setFormError(null); setShowArchiveModal(true); }} className="flex h-12 w-12 items-center justify-center rounded-lg text-accent-archive hover:bg-accent-archive/10 transition-colors" title="Archive" aria-label={`Archive ${product.name}`}><Archive size={18} /></button>}
                     </div>
@@ -803,9 +787,9 @@ export default function ProductsPage() {
         />
       )}
       {showImportModal && <ImportModal branches={branches} onClose={() => setShowImportModal(false)} />}
-      {showRestockModal && <RestockModal products={sellableProducts(products)} branches={branches} isOwner={isOwner} onClose={() => setShowRestockModal(false)} />}
-      {historyProduct && shopFilter && <StockHistoryModal productId={historyProduct.id} productName={historyProduct.name} branchId={shopFilter} branchName={branches.find((b) => b.id === shopFilter)?.name ?? ''} isOwner={isOwner} onClose={() => setHistoryProduct(null)} />}
-      {showResetModal && isOwner && (
+      {showRestockModal && <RestockModal products={sellableProducts(products)} branches={branches} isOwner={canManage} onClose={() => setShowRestockModal(false)} />}
+      {historyProduct && shopFilter && <StockHistoryModal productId={historyProduct.id} productName={historyProduct.name} branchId={shopFilter} branchName={branches.find((b) => b.id === shopFilter)?.name ?? ''} isOwner={canManage} onClose={() => setHistoryProduct(null)} />}
+      {showResetModal && canManage && (
         <Modal title="Reset all stock to 0?" onClose={() => { if (!resetAllStock.isPending) { setShowResetModal(false); setResetConfirmText(''); } }}>
           <div className="space-y-4">
             <div className="flex items-start gap-3 rounded-lg border border-accent-red/30 bg-accent-red/10 p-3">

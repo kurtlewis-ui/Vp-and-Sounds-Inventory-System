@@ -16,11 +16,9 @@ import { useAuthStore } from '@/lib/store';
 import type { Branch } from '@/lib/types';
 
 export default function ShopsPage() {
-  // Shops: Owner can add / edit / archive. Admin can ARCHIVE only (no add,
-  // no edit) — the backend enforces this split too (create/update stay
-  // Owner-only; archive/restore now allow Admin).
+  // Owner and Admin share shop management.
   const role = useAuthStore((s) => s.user?.role?.name);
-  const canManage = role === 'Owner';
+  const canManage = role === 'Owner' || role === 'Admin';
   const canArchive = role === 'Owner' || role === 'Admin';
   const { data, isLoading, isError, error } = useBranches();
   const createBranch = useCreateBranch();

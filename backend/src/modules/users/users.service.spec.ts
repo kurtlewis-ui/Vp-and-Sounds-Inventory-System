@@ -7,10 +7,8 @@ import { UploadService } from '../../common/upload/upload.service';
 
 /**
  * Unit tests for the permission rules in UsersService — the "who can manage
- * whom" guards. These protect against privilege escalation: an Admin must only
- * ever manage Staff (never create/edit/delete/restore/reset an Owner or a peer
- * Admin, and never assign a non-Staff role). An Owner can manage anyone (but
- * can't delete their own account). Mocked Prisma — no database.
+ * whom" guards. Admin may manage Admin/Staff, never Owner. Owners may manage
+ * all supported roles (but cannot delete their own account). Mocked Prisma — no database.
  */
 const OWNER_ROLE = 'Owner';
 const ADMIN_ROLE = 'Admin';
@@ -41,6 +39,12 @@ describe('UsersService — permissions', () => {
     prisma = module.get(PrismaService);
   });
 
+  it('does not offer the Owner role to Admin', async () => {
+    prisma.role.findMany.mockResolvedValue([]);
+    await service.getRoles('Admin');
+    expect(prisma.role.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { name: { in: ['Admin', 'Staff'] } } }));
+  });
+
   // ---- create --------------------------------------------------------------
   it('lists only supported roles', async () => {
     prisma.role.findMany.mockResolvedValue([]);
@@ -67,17 +71,13 @@ describe('UsersService — permissions', () => {
   });
 
   describe('create', () => {
-    it('forbids an Admin from creating a non-Staff (Admin) account', async () => {
-      prisma.user.findUnique.mockResolvedValue(null); // email free
+    it('allows an Admin to create an Admin account', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
       prisma.role.findUnique.mockResolvedValue({ id: 'r-admin', name: 'Admin' });
-
-      await expect(
-        service.create(
-          { email: 'x@x.com', password: 'p', firstName: 'A', lastName: 'B', roleId: 'r-admin' } as any,
-          'admin-1',
-          ADMIN_ROLE,
-        ),
-      ).rejects.toThrow(/only create Staff/i);
+      prisma.user.create.mockResolvedValue({ id: 'peer', role: { name: 'Admin' }, passwordHash: 'private' });
+      const result = await service.create({ email: 'peer@test.invalid', password: 'p', roleId: 'r-admin' } as any, 'admin-1', ADMIN_ROLE);
+      expect(result).toHaveProperty('id', 'peer');
+      expect(result).not.toHaveProperty('passwordHash');
     });
 
     it('forbids an Admin from creating an Owner account', async () => {
@@ -118,22 +118,23 @@ describe('UsersService — permissions', () => {
       prisma.user.findFirst.mockResolvedValue({ id: 'u1', isActive: true, roleId: 'r-owner', role: { name: 'Owner' } });
       await expect(
         service.update('u1', { firstName: 'New' } as any, 'admin-1', ADMIN_ROLE),
-      ).rejects.toThrow(/only manage Staff/i);
+      ).rejects.toThrow(/only manage Admin or Staff/i);
     });
 
-    it('forbids an Admin from editing a peer Admin', async () => {
-      prisma.user.findFirst.mockResolvedValue({ id: 'u1', isActive: true, roleId: 'r-admin', role: { name: 'Admin' } });
-      await expect(
-        service.update('u1', { firstName: 'New' } as any, 'admin-1', ADMIN_ROLE),
-      ).rejects.toThrow(ForbiddenException);
+    it('allows an Admin to edit a peer Admin', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'peer', isActive: true, roleId: 'r-admin', role: { name: 'Admin' } });
+      prisma.user.update.mockResolvedValue({ id: 'peer', firstName: 'Updated', passwordHash: 'private' });
+      const result = await service.update('peer', { firstName: 'Updated' }, 'admin-1', ADMIN_ROLE);
+      expect(result).toHaveProperty('firstName', 'Updated');
+      expect(result).not.toHaveProperty('passwordHash');
     });
 
-    it('forbids an Admin from promoting a Staff to a non-Staff role', async () => {
+    it('forbids an Admin from promoting Staff to Owner', async () => {
       prisma.user.findFirst.mockResolvedValue({ id: 'u1', isActive: true, roleId: 'r-staff', role: { name: 'Staff' } });
-      prisma.role.findUnique.mockResolvedValue({ id: 'r-admin', name: 'Admin' });
+      prisma.role.findUnique.mockResolvedValue({ id: 'r-owner', name: 'Owner' });
       await expect(
-        service.update('u1', { roleId: 'r-admin' } as any, 'admin-1', ADMIN_ROLE),
-      ).rejects.toThrow(/only assign the Staff role/i);
+        service.update('u1', { roleId: 'r-owner' } as any, 'admin-1', ADMIN_ROLE),
+      ).rejects.toThrow(/only assign Admin or Staff/i);
     });
   });
 
@@ -143,7 +144,7 @@ describe('UsersService — permissions', () => {
       prisma.user.findFirst.mockResolvedValue({ id: 'u1', role: { name: 'Owner' } });
       await expect(
         service.resetPassword('u1', 'NewPass123!', 'NewPass123!', 'admin-1', ADMIN_ROLE),
-      ).rejects.toThrow(/only reset Staff/i);
+      ).rejects.toThrow(/only reset Admin or Staff/i);
     });
 
     it('rejects mismatched new passwords', async () => {
@@ -155,9 +156,9 @@ describe('UsersService — permissions', () => {
 
   // ---- remove --------------------------------------------------------------
   describe('remove', () => {
-    it('forbids an Admin from deleting a peer Admin', async () => {
-      prisma.user.findFirst.mockResolvedValue({ id: 'u1', role: { name: 'Admin' } });
-      await expect(service.remove('u1', 'admin-1', ADMIN_ROLE)).rejects.toThrow(/only delete Staff/i);
+    it('forbids an Admin from deleting an Owner', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'u1', role: { name: 'Owner' } });
+      await expect(service.remove('u1', 'admin-1', ADMIN_ROLE)).rejects.toThrow(/only delete Admin or Staff/i);
     });
 
     it('prevents an Owner from deleting their own account', async () => {
@@ -170,8 +171,24 @@ describe('UsersService — permissions', () => {
   describe('restore', () => {
     it('forbids an Admin from restoring an Owner', async () => {
       prisma.user.findFirst.mockResolvedValue({ id: 'u1', deletedAt: new Date(), role: { name: 'Owner' } });
-      await expect(service.restore('u1', 'admin-1', ADMIN_ROLE)).rejects.toThrow(/only restore Staff/i);
+      await expect(service.restore('u1', 'admin-1', ADMIN_ROLE)).rejects.toThrow(/only restore Admin or Staff/i);
     });
+  });
+
+  it('allows Admin to reset a peer password and revokes sessions', async () => {
+    prisma.user.findFirst.mockResolvedValue({ id: 'peer', role: { name: 'Admin' } });
+    await service.resetPassword('peer', 'StrongPass123!', 'StrongPass123!', 'actor', ADMIN_ROLE);
+    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'peer' } }));
+    expect(prisma.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'peer' } });
+  });
+  it('allows Admin to archive and restore a peer', async () => {
+    prisma.user.findFirst.mockResolvedValue({ id: 'peer', role: { name: 'Admin' }, deletedAt: new Date() });
+    prisma.user.update.mockResolvedValue({ id: 'peer', passwordHash: 'private' });
+    await service.remove('peer', 'actor', ADMIN_ROLE);
+    prisma.user.findFirst.mockResolvedValueOnce({ id: 'peer', email: 'peer@test.invalid', role: { name: 'Admin' }, deletedAt: new Date() }).mockResolvedValueOnce(null);
+    const result = await service.restore('peer', 'actor', ADMIN_ROLE);
+    expect(result).toHaveProperty('id', 'peer');
+    expect(result).not.toHaveProperty('passwordHash');
   });
 
   // ---- findAll visibility --------------------------------------------------
@@ -198,7 +215,7 @@ describe('UsersService — permissions', () => {
     prisma.user.findMany = jest.fn().mockResolvedValue([]);
     await service.findArchived({} as any, role);
     const where = prisma.user.findMany.mock.calls[0][0].where;
-    expect(where.role).toEqual(role === 'Owner' ? undefined : { name: 'Staff' });
+    expect(where.role).toEqual(role === 'Owner' ? undefined : { name: { in: ['Admin', 'Staff'] } });
     expect(prisma.user.count).toHaveBeenCalledWith({ where });
   });
 });

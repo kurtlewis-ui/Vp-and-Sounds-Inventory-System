@@ -26,8 +26,8 @@ function fixture(current: any = null) {
 }
 
 describe('Product flavor/color stock rules', () => {
-  it('keeps creation Owner-only', () => {
-    expect(Reflect.getMetadata(ROLES_KEY, ProductsController.prototype.create)).toEqual(['Owner']);
+  it('allows management roles to create products', () => {
+    expect(Reflect.getMetadata(ROLES_KEY, ProductsController.prototype.create)).toEqual(['Owner', 'Admin']);
   });
   it('creates a parent with zero physical stock and separately identified option stock', async () => {
     const { prisma, tx } = fixture();

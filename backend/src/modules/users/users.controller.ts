@@ -64,8 +64,8 @@ export class UsersController {
   @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Get all roles' })
   @ApiResponse({ status: 200, description: 'Roles retrieved successfully' })
-  async getRoles() {
-    const roles = await this.usersService.getRoles();
+  async getRoles(@CurrentUser() user: RequestUser) {
+    const roles = await this.usersService.getRoles(user.role);
     
     return {
       success: true,

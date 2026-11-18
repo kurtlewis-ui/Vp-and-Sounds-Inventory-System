@@ -34,7 +34,7 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Create a new product' })
   async create(@Body() dto: CreateProductDto, @CurrentUser() user: RequestUser) {
     const data = await this.productsService.create(dto, user.userId, user.role);
@@ -49,7 +49,7 @@ export class ProductsController {
   }
 
   @Post('import')
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Bulk import products (creates/updates; auto-creates brands)' })
   async importProducts(@Body() dto: ImportProductsDto, @CurrentUser() user: RequestUser) {
     const data = await this.productsService.importProducts(dto.products, user.userId);
@@ -57,7 +57,7 @@ export class ProductsController {
   }
 
   @Post('restock')
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Add stock to products at branches' })
   async restock(@Body() dto: RestockDto, @CurrentUser() user: RequestUser) {
     const data = await this.productsService.restock(dto.items, user.userId);
@@ -65,23 +65,23 @@ export class ProductsController {
   }
 
   @Post('stock-movements/undo')
-  @Roles('Owner')
-  @ApiOperation({ summary: 'Owner-only: undo restock/adjustment stock movements (appends compensating movements)' })
+  @Roles('Owner', 'Admin')
+  @ApiOperation({ summary: 'Owner/Admin: undo restock/adjustment stock movements (appends compensating movements)' })
   async undoStock(@Body() dto: UndoStockDto, @CurrentUser() user: RequestUser) {
     const data = await this.productsService.undoStockMovements(dto.movementIds, user.userId);
     return { success: true, data };
   }
 
   @Post('stock/reset')
-  @Roles('Owner')
-  @ApiOperation({ summary: 'Owner-only: reset ALL product stock to 0 at every branch (type-to-confirm)' })
+  @Roles('Owner', 'Admin')
+  @ApiOperation({ summary: 'Owner/Admin: reset ALL product stock to 0 at every branch (type-to-confirm)' })
   async resetStock(@Body() _dto: ResetStockDto, @CurrentUser() user: RequestUser) {
     const data = await this.productsService.resetAllStock(user.userId);
     return { success: true, data };
   }
 
   @Patch('reorder')
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Persist a manual product display order' })
   async reorder(@Body() dto: ReorderProductsDto, @CurrentUser() user: RequestUser) {
     const data = await this.productsService.reorder(dto.orderedIds, user.userId);
@@ -90,7 +90,7 @@ export class ProductsController {
 
   @Get('archived')
   @Roles('Owner', 'Admin')
-  @ApiOperation({ summary: 'List archived (soft-deleted) products (read-only for Admin)' })
+  @ApiOperation({ summary: 'List archived (soft-deleted) products' })
   async findArchived(@Query() query: QueryProductDto, @CurrentUser() user: RequestUser) {
     const result = await this.productsService.findArchived(query, user.role);
     return { success: true, data: result.data, pagination: result.pagination };
@@ -121,14 +121,10 @@ export class ProductsController {
     return { success: true, data };
   }
 
-  // Owner may edit everything (name, prices, per-branch stock, image). Admin
-  // may ONLY change the image — the service strips every other field for an
-  // Admin actor, so quantity / selling price / cost price can never be touched
-  // (nor seen) by an Admin. Admin is allowed on this route but constrained
-  // server-side.
+  // Both management roles edit products; only Owner may change cost.
   @Patch(':id')
   @Roles('Owner', 'Admin')
-  @ApiOperation({ summary: 'Update a product (Admin: image only; Owner: full, incl. per-branch stock)' })
+  @ApiOperation({ summary: 'Update a product (Owner/Admin; cost remains Owner-only)' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,

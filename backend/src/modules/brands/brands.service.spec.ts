@@ -17,6 +17,13 @@ describe('BrandsService — per-branch archive', () => {
   let service: BrandsService;
   let prisma: any;
 
+  it('allows Admin to rename a brand and change its active state', async () => {
+    prisma.brand.findFirst.mockResolvedValueOnce({ id: BRAND_ID, name: 'Old' }).mockResolvedValueOnce(null);
+    prisma.brand.update = jest.fn().mockResolvedValue({ id: BRAND_ID, name: 'New', slug: 'new', coverImage: null, isActive: false, _count: { products: 0 } });
+    await service.update(BRAND_ID, { name: 'New', isActive: false }, 'admin', 'Admin');
+    expect(prisma.brand.update).toHaveBeenCalledWith(expect.objectContaining({ data: { name: 'New', slug: 'new', isActive: false } }));
+  });
+
   beforeEach(async () => {
     const mockPrisma = {
       brand: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn() },
