@@ -1,29 +1,19 @@
 'use client';
-import { sellableProducts } from '@/lib/product-options';
 
 import { Fragment, useMemo, useState } from 'react';
-import { Search, ShoppingCart, Pencil, Trash2, Check } from 'lucide-react';
+import { Search, ShoppingCart } from 'lucide-react';
 import {
   useSalesPending,
   useDisposals,
   useExpenses,
-  useProducts,
-  useUpdateSale,
-  useDeleteSale,
-  useDeleteDisposal,
-  useDeleteExpense,
 } from '@/lib/hooks';
 import { useAuthStore } from '@/lib/store';
 import { getApiErrorMessage } from '@/lib/api';
 import { TableSkeleton } from '@/components/Skeleton';
 import { Select } from '@/components/Select';
-import { EditSaleModal } from '@/components/EditSaleModal';
 import { ProductThumb } from '@/components/ProductThumb';
-import { useToast } from '@/components/Toast';
-import { withScrollPreserved } from '@/lib/useUnsavedGuard';
 import { phBusinessToday } from '@/lib/business-day';
 import { filterSalesByProduct } from '@/lib/sale-search';
-import type { Sale, Disposal, Expense } from '@/lib/types';
 
 function peso(n: number | null | undefined) {
   const v = typeof n === 'number' && Number.isFinite(n) ? n : 0;
@@ -73,71 +63,7 @@ export default function StaffDailyReportPage() {
   const [search, setSearch] = useState('');
 
   const branchName = useAuthStore((s) => s.user?.branch?.name);
-  // Current staff's own id + branch — used to gate the Edit/Delete buttons to
-  // the staff member's OWN pending sales, and to load their branch catalog for
-  // the edit modal.
-  const myUserId = useAuthStore((s) => s.user?.id);
-  const myBranchId = useAuthStore((s) => s.user?.branch?.id);
-  const toast = useToast();
-
-  // Edit / delete state. `editingSale` opens the shared EditSaleModal;
-  // `confirmDeleteId` arms the two-click delete confirm.
-  const [editingSale, setEditingSale] = useState<Sale | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  const updateSale = useUpdateSale();
-  const deleteSale = useDeleteSale();
-  const deleteDisposal = useDeleteDisposal();
-  const deleteExpense = useDeleteExpense();
-
-  // Separate arm/confirm state per section so a click in one section can't
-  // visually arm a row in another.
-  const [confirmDeleteDisposalId, setConfirmDeleteDisposalId] = useState<string | null>(null);
-  const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState<string | null>(null);
-
-  // Branch product catalog for the edit modal (full active list, not the
-  // default first page, so sold items resolve correctly). Scoped to the
-  // staff's own branch, matching where their sales live.
-  const { data: productData } = useProducts({ branchId: myBranchId || undefined, limit: 1000 });
-  const products = productData?.data ?? [];
-
-  // A pending sale is editable/deletable only by the staff who OWNS it and only
-  // while still PENDING (approved sales are locked). This mirrors the backend's
-  // own guards, so the buttons never appear for actions the server would reject.
-  const canManageSale = (sale: Sale) => sale.status === 'PENDING' && sale.staff?.id === myUserId;
-
-  const handleDelete = async (sale: Sale) => {
-    try {
-      await withScrollPreserved(() => deleteSale.mutateAsync(sale.id));
-      setConfirmDeleteId(null);
-    } catch (e) {
-      toast.error(getApiErrorMessage(e), 'Delete failed');
-    }
-  };
-
-  // A pending disposal is deletable only by the staff who created it and only
-  // while PENDING (approved is locked). Deleting it restores reserved stock
-  // server-side. Mirrors the backend guards.
-  const canManageDisposal = (d: Disposal) => d.status === 'PENDING' && d.createdById === myUserId;
-  const handleDeleteDisposal = async (d: Disposal) => {
-    try {
-      await withScrollPreserved(() => deleteDisposal.mutateAsync(d.id));
-      setConfirmDeleteDisposalId(null);
-    } catch (e) {
-      toast.error(getApiErrorMessage(e), 'Delete failed');
-    }
-  };
-
-  // A pending expense is deletable only by its own staff, only while PENDING.
-  const canManageExpense = (e: Expense) => e.status === 'PENDING' && e.staff?.id === myUserId;
-  const handleDeleteExpense = async (e: Expense) => {
-    try {
-      await withScrollPreserved(() => deleteExpense.mutateAsync(e.id));
-      setConfirmDeleteExpenseId(null);
-    } catch (err) {
-      toast.error(getApiErrorMessage(err), 'Delete failed');
-    }
-  };
+  // Reports are read-only; corrections are handled by Owner/Admin.
 
   // Current PH BUSINESS date — shown only as a header label for context now
   // that the report lists pending items by status rather than by day.
@@ -270,7 +196,7 @@ export default function StaffDailyReportPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Sub Total</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Payment</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Actions</th>
+
               </tr>
             </thead>
             <tbody>
@@ -312,52 +238,11 @@ export default function StaffDailyReportPage() {
                       <td className="px-4 py-3 text-sm">
                         <DateTimeStack iso={item.addedAt ?? sale.createdAt} />
                       </td>
-                      <td className="px-4 py-3">
-                        {idx === 0 && canManageSale(sale) && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setEditingSale(sale)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-secondary transition hover:bg-white/10 hover:text-text-primary"
-                              title="Edit sale"
-                              aria-label={`Edit sale #${sale.number}`}
-                            >
-                              <Pencil size={15} />
-                            </button>
-                            {confirmDeleteId === sale.id ? (
-                              <>
-                                <button
-                                  onClick={() => handleDelete(sale)}
-                                  disabled={deleteSale.isPending}
-                                  className="flex h-8 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                                  title="Confirm delete"
-                                  aria-label={`Confirm delete sale #${sale.number}`}
-                                >
-                                  <Check size={14} /> Confirm
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDeleteId(null)}
-                                  className="rounded-lg px-2 py-1 text-xs font-medium text-text-muted transition hover:bg-white/10 hover:text-text-primary"
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmDeleteId(sale.id)}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-accent-red transition hover:bg-accent-red/10"
-                                title="Delete sale"
-                                aria-label={`Delete sale #${sale.number}`}
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
+
                     </tr>
                   ))}
                   <tr className="bg-surface-muted border-t border-card-border">
-                    <td colSpan={10} className="px-4 py-2 text-sm font-semibold text-text-primary">
+                    <td colSpan={9} className="px-4 py-2 text-sm font-semibold text-text-primary">
                       Total for Sale #{sale.number}: {peso(sale.visibleTotal)}
                     </td>
                   </tr>
@@ -379,45 +264,7 @@ export default function StaffDailyReportPage() {
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <span className="text-[11px] text-text-muted">{formatDate(sale.createdAt)}</span>
-                      {canManageSale(sale) && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setEditingSale(sale)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-secondary transition hover:bg-white/10 hover:text-text-primary"
-                            title="Edit sale"
-                            aria-label={`Edit sale #${sale.number}`}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          {confirmDeleteId === sale.id ? (
-                            <>
-                              <button
-                                onClick={() => handleDelete(sale)}
-                                disabled={deleteSale.isPending}
-                                className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-[11px] font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                                title="Confirm delete"
-                              >
-                                <Check size={13} /> Confirm
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="rounded-lg px-2 py-1 text-[11px] font-medium text-text-muted transition hover:bg-white/10 hover:text-text-primary"
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmDeleteId(sale.id)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-accent-red transition hover:bg-accent-red/10"
-                              title="Delete sale"
-                              aria-label={`Delete sale #${sale.number}`}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      )}
+
                     </div>
                   </div>
                   <ul className="space-y-1.5">
@@ -608,7 +455,7 @@ export default function StaffDailyReportPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Price</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Reason</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Actions</th>
+
               </tr>
             </thead>
             <tbody>
@@ -623,37 +470,7 @@ export default function StaffDailyReportPage() {
                   <td className="px-4 py-3 text-sm font-medium text-text-primary">{peso(d.sellingValue)}</td>
                   <td className="px-4 py-3 text-sm text-text-secondary">{d.reason ?? '—'}</td>
                   <td className="px-4 py-3 text-sm"><DateTimeStack iso={d.addedAt ?? d.createdAt} /></td>
-                  <td className="px-4 py-3">
-                    {canManageDisposal(d) && (
-                      confirmDeleteDisposalId === d.id ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleDeleteDisposal(d)}
-                            disabled={deleteDisposal.isPending}
-                            className="flex h-8 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                            title="Confirm delete"
-                          >
-                            <Check size={14} /> Confirm
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteDisposalId(null)}
-                            className="rounded-lg px-2 py-1 text-xs font-medium text-text-muted transition hover:bg-white/10 hover:text-text-primary"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDeleteDisposalId(d.id)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-accent-red transition hover:bg-accent-red/10"
-                          title="Delete disposal"
-                          aria-label="Delete disposal"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )
-                    )}
-                  </td>
+
                 </tr>
               ))}
             </tbody>
@@ -673,35 +490,7 @@ export default function StaffDailyReportPage() {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <span className="text-sm font-medium text-text-primary">{peso(d.sellingValue)}</span>
-                  {canManageDisposal(d) && (
-                    confirmDeleteDisposalId === d.id ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleDeleteDisposal(d)}
-                          disabled={deleteDisposal.isPending}
-                          className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-[11px] font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                          title="Confirm delete"
-                        >
-                          <Check size={13} /> Confirm
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteDisposalId(null)}
-                          className="rounded-lg px-2 py-1 text-[11px] font-medium text-text-muted transition hover:bg-white/10 hover:text-text-primary"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmDeleteDisposalId(d.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-accent-red transition hover:bg-accent-red/10"
-                        title="Delete disposal"
-                        aria-label="Delete disposal"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )
-                  )}
+
                 </div>
               </li>
             ))}
@@ -725,7 +514,7 @@ export default function StaffDailyReportPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Amount</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Note</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Actions</th>
+
               </tr>
             </thead>
             <tbody>
@@ -736,37 +525,7 @@ export default function StaffDailyReportPage() {
                   </td>
                   <td className="px-4 py-3 text-sm text-text-secondary">{e.note}</td>
                   <td className="px-4 py-3 text-sm"><DateTimeStack iso={e.addedAt ?? e.createdAt} /></td>
-                  <td className="px-4 py-3">
-                    {canManageExpense(e) && (
-                      confirmDeleteExpenseId === e.id ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleDeleteExpense(e)}
-                            disabled={deleteExpense.isPending}
-                            className="flex h-8 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                            title="Confirm delete"
-                          >
-                            <Check size={14} /> Confirm
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteExpenseId(null)}
-                            className="rounded-lg px-2 py-1 text-xs font-medium text-text-muted transition hover:bg-white/10 hover:text-text-primary"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDeleteExpenseId(e.id)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-accent-red transition hover:bg-accent-red/10"
-                          title="Delete expense"
-                          aria-label="Delete expense"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )
-                    )}
-                  </td>
+
                 </tr>
               ))}
             </tbody>
@@ -782,35 +541,7 @@ export default function StaffDailyReportPage() {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <span className="text-sm font-medium text-text-primary">{peso(e.amount)}</span>
-                  {canManageExpense(e) && (
-                    confirmDeleteExpenseId === e.id ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleDeleteExpense(e)}
-                          disabled={deleteExpense.isPending}
-                          className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-[11px] font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                          title="Confirm delete"
-                        >
-                          <Check size={13} /> Confirm
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteExpenseId(null)}
-                          className="rounded-lg px-2 py-1 text-[11px] font-medium text-text-muted transition hover:bg-white/10 hover:text-text-primary"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmDeleteExpenseId(e.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-accent-red transition hover:bg-accent-red/10"
-                        title="Delete expense"
-                        aria-label="Delete expense"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )
-                  )}
+
                 </div>
               </li>
             ))}
@@ -843,25 +574,8 @@ export default function StaffDailyReportPage() {
         </div>
       </div>
 
-      {/* Edit modal for a pending sale (shared with the Pending page). On save
-          it PATCHes the sale, which restores the old stock and reserves the new
-          quantities server-side, then refreshes the report. */}
-      {editingSale && (
-        <EditSaleModal
-          sale={editingSale}
-          products={sellableProducts(products)}
-          isSaving={updateSale.isPending}
-          onClose={() => setEditingSale(null)}
-          onSave={async (payload) => {
-            try {
-              await withScrollPreserved(() => updateSale.mutateAsync({ id: editingSale.id, ...payload }));
-              setEditingSale(null);
-            } catch (e) {
-              throw new Error(getApiErrorMessage(e));
-            }
-          }}
-        />
-      )}
+
+
 
     </div>
   );
