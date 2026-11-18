@@ -23,7 +23,7 @@ function formatDate(iso: string) {
 }
 
 export default function DisposalsPage() {
-  const isOwner = useAuthStore((s) => s.user?.role?.name === 'Owner');
+  const isOwner = useAuthStore((s) => ['Owner', 'Admin'].includes(s.user?.role?.name ?? ''));
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [startDate, setStartDate] = useState('');

@@ -28,6 +28,7 @@ export class ProductsService {
   archiveOption(id: string, userId: string, restore: boolean, branchId?: string) { return changeOptionArchive(this.prisma, id, userId, restore, branchId); }
 
   async create(dto: CreateProductDto, createdBy: string, role?: string) {
+    if (role !== 'Owner') { dto = { ...dto }; delete dto.costPrice; }
     if (dto.variantType && dto.variantType !== 'NONE') {
       const image = await this.upload.uploadDataUrl(dto.image?.trim() || null, 'products');
       const id = await saveProductOptions(this.prisma, { ...dto, image: image ?? undefined }, createdBy);
@@ -238,6 +239,7 @@ export class ProductsService {
   }
 
   async update(id: string, dto: UpdateProductDto, updatedBy: string, role?: string) {
+    if (role !== 'Owner') { dto = { ...dto }; delete dto.costPrice; }
     const current = await this.prisma.product.findFirst({
       where: { id, deletedAt: null },
     });
@@ -246,35 +248,12 @@ export class ProductsService {
     }
 
     if (current.parentId) throw new BadRequestException('Edit this flavor/color from its parent product.');
-    if (role !== 'Admin' && (current.variantType !== 'NONE' || (dto.variantType && dto.variantType !== 'NONE'))) {
+    if (current.variantType !== 'NONE' || (dto.variantType && dto.variantType !== 'NONE')) {
       const image = dto.image === undefined ? undefined : await this.upload.uploadDataUrl(dto.image?.trim() || null, 'products');
       await saveProductOptions(this.prisma, { ...dto, ...(image !== undefined ? { image: image ?? '' } : {}) }, updatedBy, id);
       return { ...await this.findOne(id, role), undoMovementIds: [] };
     }
     if (dto.options?.length) throw new BadRequestException('Choose flavors or colors before adding options.');
-    // Admin may ONLY change the product image. We short-circuit here so an
-    // Admin request can never touch name, brand, selling price, cost price,
-    // low-stock alert, OR per-branch quantities — regardless of what the
-    // payload contains. This is enforced server-side (not just hidden in the
-    // UI) so a hand-crafted request can't bypass it. Owner edits fall through
-    // to the full logic below.
-    if (role === 'Admin') {
-      const data: any = {};
-      if (dto.image !== undefined) {
-        data.image = await this.upload.uploadDataUrl(dto.image?.trim() || null, 'products');
-      }
-      await this.prisma.product.update({ where: { id }, data });
-
-      await this.audit(updatedBy, 'PRODUCT_IMAGE_UPDATED', id, { name: current.name }, { image: data.image ?? null });
-
-      const updatedForAdmin = await this.prisma.product.findUnique({
-        where: { id },
-        include: this.includeFull(),
-      });
-      // Admins never receive owner-only fields; undoMovementIds is always empty
-      // because an image-only edit changes no stock.
-      return { ...this.serialize(updatedForAdmin!, false), undoMovementIds: [] as string[] };
-    }
 
     if (dto.brandId) {
       const brand = await this.prisma.brand.findFirst({

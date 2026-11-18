@@ -28,7 +28,7 @@ export class BrandsController {
   constructor(private readonly brandsService: BrandsService) {}
 
   @Post()
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Create a new brand' })
   async create(@Body() dto: CreateBrandDto, @CurrentUser() user: RequestUser) {
     const data = await this.brandsService.create(dto, user.userId);

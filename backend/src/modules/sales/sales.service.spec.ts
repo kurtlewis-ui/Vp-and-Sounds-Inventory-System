@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PaymentMethod } from '@prisma/client';
+import { PaymentMethod, Prisma } from '@prisma/client';
 import type { RequestUser } from '../../common/interfaces/request-user.interface';
 
 /**
@@ -221,9 +221,12 @@ describe('SalesService', () => {
 
   // ---- update (edit a pending sale) ---------------------------------------
   describe('update — who may edit', () => {
-    it('forbids an Admin from editing a sale', async () => {
-      prisma.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'PENDING', staffId: STAFF.userId, items: [] });
-      await expect(service.update('sale-1', { customerName: 'x' }, ADMIN)).rejects.toThrow(ForbiddenException);
+    it('allows Admin to edit pending sale metadata', async () => {
+      prisma.sale.findUnique.mockResolvedValue({ id: 'sale-1', number: 1, status: 'PENDING', staffId: STAFF.userId, items: [] });
+      prisma.sale.update.mockResolvedValue({ id: 'sale-1', number: 1, status: 'PENDING', customerName: 'Updated', total: new Prisma.Decimal(0), items: [], createdAt: new Date(), branch: { id: BRANCH_ID, name: 'Shop' }, staff: { id: 'staff', firstName: 'A', lastName: 'B' } });
+      const result = await service.update('sale-1', { customerName: 'Updated' }, ADMIN);
+      expect(prisma.sale.update).toHaveBeenCalledWith(expect.objectContaining({ data: { customerName: 'Updated' } }));
+      expect(result).toHaveProperty('customerName', 'Updated');
     });
 
     it("forbids a Staff from editing another staff's sale", async () => {

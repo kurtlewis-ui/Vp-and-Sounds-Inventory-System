@@ -39,9 +39,9 @@ export default function BrandsPage() {
   // stays Owner-only; archive/restore allow Admin; update strips everything but
   // the cover image for an Admin actor).
   const role = useAuthStore((s) => s.user?.role?.name);
-  const canManage = role === 'Owner';
+  const canManage = role === 'Owner' || role === 'Admin';
   const canArchive = role === 'Owner' || role === 'Admin';
-  const canEditPhotoOnly = role === 'Admin';
+  const canEditPhotoOnly = false;
   // Per-branch brand remove ("Remove from [shop]") — Owner + Admin, and only
   // when a single shop is selected (not "All Shops").
   const canRemoveFromBranch = role === 'Owner' || role === 'Admin';

@@ -28,7 +28,7 @@ export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
   @Post()
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Create a new branch' })
   @ApiResponse({ status: 201, description: 'Branch created' })
   @ApiResponse({ status: 409, description: 'Branch name already exists' })
@@ -83,7 +83,7 @@ export class BranchesController {
   }
 
   @Patch(':id')
-  @Roles('Owner')
+  @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Update a branch' })
   @ApiResponse({ status: 200, description: 'Branch updated' })
   @ApiResponse({ status: 404, description: 'Branch not found' })

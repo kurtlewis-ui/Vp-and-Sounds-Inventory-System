@@ -199,10 +199,9 @@ export default function SalesPendingPage() {
   const sales = useMemo(() => filterSalesByProduct(data?.data ?? [], search), [data?.data, search]);
   const summary = data?.summary ?? { grossSales: 0, cash: 0, gcash: 0, bpi: 0, bdo: 0, discount: 0, total: 0, count: 0 };
 
-  // Admin may approve/decline pending sales but must NOT edit them (the backend
-  // rejects Admin edits too). Only the Owner sees the Edit control here.
-  const canEditSale = useAuthStore((s) => s.user?.role?.name === 'Owner');
-  // Admin: no Net in the Today strip, and disposals shown at selling price.
+  // Owner and Admin may edit and approve pending work.
+  const canEditSale = useAuthStore((s) => ['Owner', 'Admin'].includes(s.user?.role?.name ?? ''));
+  // Admin uses cost-free Net Total and selling-price disposal values.
   const isAdmin = useAuthStore((s) => s.user?.role?.name === 'Admin');
 
   const approveSale = useApproveSale();
@@ -213,7 +212,7 @@ export default function SalesPendingPage() {
   const { data: disposalData, isLoading: dispLoading } = useDisposalsPending({
     search,
     branchId: selectedShop || undefined,
-  }, !isAdmin && !!selectedShop);
+  }, !!selectedShop);
   const disposals = disposalData?.data ?? [];
   const approveDisposal = useApproveDisposal();
   const declineDisposal = useDeclineDisposal();
@@ -222,14 +221,13 @@ export default function SalesPendingPage() {
   const { data: expenseData, isLoading: expLoading } = useExpensesPending({
     search,
     branchId: selectedShop || undefined,
-  }, !isAdmin && !!selectedShop);
+  }, !!selectedShop);
   const expenses = expenseData?.data ?? [];
   const approveExpense = useApproveExpense();
   const declineExpense = useDeclineExpense();
 
-  // Staff draft carts (not yet submitted). Section is hidden for Admin, so
-  // skip the polling query too.
-  const { data: draftsData, isLoading: draftsLoading } = useStaffDrafts(selectedShop || undefined, !isAdmin && !!selectedShop);
+  // Both management roles can review submitted and in-progress work.
+  const { data: draftsData, isLoading: draftsLoading } = useStaffDrafts(selectedShop || undefined, !!selectedShop);
   const drafts = draftsData ?? [];
   const saveDraftForStaff = useSaveDraftForStaff();
   const clearStaffDraft = useClearStaffDraft();
@@ -632,9 +630,8 @@ export default function SalesPendingPage() {
         </div>
       </div>
 
-      {/* Staff Drafts, Pending Disposals and Pending Expenses are hidden for
-          Admin (their queries are also disabled above). Owner sees all three. */}
-      {!isAdmin && (
+      {/* Shared management queues, with role-safe disposal values. */}
+      {(
         <>
       {/* Staff Drafts (in-progress carts, not yet submitted) */}
       <div className="bg-card-bg rounded-xl border border-card-border shadow-sm mt-8">
