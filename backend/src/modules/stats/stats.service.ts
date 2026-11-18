@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { SaleStatus, ExpenseStatus, DisposalStatus } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { paymentSummarySql, saleAggregatePredicate } from '../../common/utils/sale-aggregate.util';
+import { Prisma, SaleStatus, ExpenseStatus, DisposalStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RequestUser } from '../../common/interfaces/request-user.interface';
 import {
@@ -218,6 +219,21 @@ export class StatsService {
   /**
    * Top selling products (by units) from approved sales.
    */
+  async disposedProducts(branchId: string | undefined, actor: RequestUser) {
+    if (!['Owner', 'Admin'].includes(actor.role)) throw new ForbiddenException('Management access required.');
+    const groups = await this.prisma.disposal.groupBy({
+      by: ['productName', 'brandName'],
+      where: { status: DisposalStatus.APPROVED, ...(branchId ? { branchId } : {}) },
+      _sum: { quantity: true, ...(actor.role === 'Owner' ? { value: true as const } : { sellingValue: true as const }) },
+      orderBy: [{ _sum: { quantity: 'desc' } }, { productName: 'asc' }, { brandName: 'asc' }],
+    });
+    return groups.map(g => {
+      const sum: { quantity: number | null; value?: Prisma.Decimal | null; sellingValue?: Prisma.Decimal | null } = g._sum;
+      return { name: g.productName, brandName: g.brandName, quantity: sum.quantity ?? 0,
+        value: Number((actor.role === 'Owner' ? sum.value : sum.sellingValue) ?? 0) };
+    });
+  }
+
   async topProducts(branchId?: string) {
     const items = await this.prisma.saleItem.groupBy({
       by: ['name', 'brandName'],
@@ -272,7 +288,7 @@ export class StatsService {
       ? { branchId: resolvedBranchId, status: DisposalStatus.PENDING }
       : { branchId: resolvedBranchId, status: DisposalStatus.APPROVED, decidedAt: { gte: start } };
 
-    const [salesAgg, expensesAgg, disposalsAgg, discountAgg, paymentItems] = await Promise.all([
+    const [salesAgg, expensesAgg, disposalsAgg, paymentItems] = await Promise.all([
       this.prisma.sale.aggregate({
         where: saleWhere,
         _sum: { total: true },
@@ -287,21 +303,10 @@ export class StatsService {
         where: disposalWhere,
         _sum: { ...(actor.role === 'Owner' ? { value: true as const } : {}), sellingValue: true },
       }),
-      // Total Discount (DISPLAY only). Summed from the sale items whose parent
-      // sale is in scope. totalSales already uses Sale.total (= Σ subTotal, net
-      // of discount), so the discount is NOT subtracted again — informational.
-      this.prisma.saleItem.aggregate({
-        where: { sale: saleWhere },
-        _sum: { discount: true },
-      }),
-      // Per-payment-method breakdown of the in-scope sales. Pulled at the item
-      // level (payment varies per item) and split across buckets exactly like
-      // the /sales list summary: a Split item contributes its split amounts,
-      // everything else contributes its subTotal to its own bucket.
-      this.prisma.saleItem.findMany({
-        where: { sale: saleWhere },
-        select: { paymentMethod: true, subTotal: true, paymentSplit: true },
-      }),
+      this.prisma.$queryRaw<Array<Record<string, Prisma.Decimal>>>(paymentSummarySql(saleAggregatePredicate({
+        status: isStaff ? SaleStatus.PENDING : SaleStatus.APPROVED,
+        branchId: resolvedBranchId, decidedRange: isStaff ? undefined : { gte: start },
+      }))),
     ]);
 
     const totalDisposalsSelling = Number(disposalsAgg._sum.sellingValue ?? 0);
@@ -310,34 +315,15 @@ export class StatsService {
     const totalSales = Number(salesAgg._sum.total ?? 0);
     const totalExpenses = Number(expensesAgg._sum.amount ?? 0);
     const totalDisposals = actor.role === 'Owner' ? Number(disposalsAgg._sum.value ?? 0) : totalDisposalsSelling;
-    const totalDiscount = Number(discountAgg._sum.discount ?? 0);
+    const totalDiscount = Number(paymentItems[0]?.discount ?? 0);
     // Gross sales = net + discount = Σ(unitPrice × qty) before any discount.
     // Derived (no extra query) so Gross − Discount = Net reconciles exactly.
     const totalGrossSales = totalSales + totalDiscount;
 
-    // Payment-method buckets (Cash / Gcash / BPI / BDO). Split items are
-    // apportioned across their buckets.
-    let cash = 0;
-    let gcash = 0;
-    let bpi = 0;
-    let bdo = 0;
-    for (const item of paymentItems) {
-      if (item.paymentMethod === 'Split' && item.paymentSplit) {
-        const split = item.paymentSplit as unknown as {
-          cash: number; gcash: number; bpi: number; bdo: number;
-        };
-        cash += Number(split.cash || 0);
-        gcash += Number(split.gcash || 0);
-        bpi += Number(split.bpi || 0);
-        bdo += Number(split.bdo || 0);
-      } else {
-        const amount = Number(item.subTotal);
-        if (item.paymentMethod === 'Cash') cash += amount;
-        else if (item.paymentMethod === 'Gcash') gcash += amount;
-        else if (item.paymentMethod === 'BPI') bpi += amount;
-        else if (item.paymentMethod === 'BDO') bdo += amount;
-      }
-    }
+    const cash = Number(paymentItems[0]?.cash ?? 0);
+    const gcash = Number(paymentItems[0]?.gcash ?? 0);
+    const bdo = Number(paymentItems[0]?.bdo ?? 0);
+    const bpi = Number(paymentItems[0]?.bpi ?? 0);
 
     return {
       branchId: resolvedBranchId,
@@ -399,7 +385,7 @@ export class StatsService {
 
     // Sum the money-side aggregates directly in the database over ALL matching
     // rows — no pagination, no per-item cost leaving the server.
-    const [itemAgg, expenseAgg, disposalAgg] = await Promise.all([
+    const [itemAgg, expenseAgg, disposalAgg, costTotals] = await Promise.all([
       // Aggregate sale items belonging to matching approved sales.
       this.prisma.saleItem.aggregate({
         where: { sale: saleWhere },
@@ -421,20 +407,13 @@ export class StatsService {
         },
         _sum: { value: true },
       }),
+      this.prisma.$queryRaw<Array<{ capital: Prisma.Decimal }>>(Prisma.sql`
+        SELECT COALESCE(SUM(i.cost_price * i.quantity), 0) AS capital
+        FROM sale_items i JOIN sales s ON s.id = i.sale_id
+        WHERE ${saleAggregatePredicate({ status: SaleStatus.APPROVED, branchId, dateRange })}`),
     ]);
 
-    // COGS needs costPrice × quantity, which a single _sum can't express, so
-    // pull just the two numeric columns for the matching items and reduce.
-    // (Only quantity + costPrice are selected — nothing identifying.)
-    const costRows = await this.prisma.saleItem.findMany({
-      where: { sale: saleWhere },
-      select: { quantity: true, costPrice: true },
-    });
-
-    let capital = 0;
-    for (const row of costRows) {
-      capital += Number(row.costPrice) * row.quantity;
-    }
+    const capital = Number(costTotals[0]?.capital ?? 0);
 
     const revenue = Number(itemAgg._sum.subTotal ?? 0);
     const totalDiscount = Number(itemAgg._sum.discount ?? 0);

@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Store, Package, PhilippinePeso, Users, BarChart3, ChevronDown, ChevronUp, Recycle, Download } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useDashboardStats, useSalesOverview, useProfitOverview, useTopProducts, useBranches, useDisposals } from '@/lib/hooks';
+import { useDashboardStats, useSalesOverview, useProfitOverview, useTopProducts, useBranches, useDisposedProducts } from '@/lib/hooks';
 import { useThemeStore } from '@/lib/theme';
 import { useAuthStore } from '@/lib/store';
 import { OwnerProfitSection } from '@/components/OwnerProfitSection';
@@ -77,22 +77,9 @@ function BusinessDashboard({ isOwner }: { isOwner: boolean }) {
   const ovError = isOwner ? profitOv.isError : salesOv.isError;
   const { data: topProducts = [], isLoading: tpLoading, isError: tpError } = useTopProducts(topShop || undefined);
 
-  // Disposals data for "Most Disposed Products" chart
-  const { data: disposalsData, isError: dpError } = useDisposals({ branchId: disposalShop || undefined });
+  // Aggregate the complete approved history in PostgreSQL, rather than downloading disposal records.
+  const { data: disposedProducts = [], isError: dpError } = useDisposedProducts(disposalShop || undefined);
   const anyLoadError = statsError || ovError || tpError || dpError;
-  const disposals = (Array.isArray(disposalsData?.data) ? disposalsData.data : []).filter((d) => d.status === 'APPROVED');
-
-  // Compute top disposed products (group by product name, sum quantity)
-  const disposedProducts = useMemo(() => {
-    const map = new Map<string, { name: string; brandName: string; quantity: number; value: number }>();
-    for (const d of disposals) {
-      const existing = map.get(d.name) ?? { name: d.name, brandName: d.brandName, quantity: 0, value: 0 };
-      existing.quantity += d.quantity;
-      existing.value += d.value;
-      map.set(d.name, existing);
-    }
-    return [...map.values()].sort((a, b) => b.quantity - a.quantity);
-  }, [disposals]);
 
   const v = (n?: number) => (isLoading || n === undefined ? '—' : n.toLocaleString());
 
