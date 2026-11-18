@@ -761,14 +761,14 @@ export function useSalesRecords(params?: {
 }) {
   return useQuery({
     queryKey: ['sales', 'records', params ?? {}],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       getList<Sale>('/sales/records', {
         limit: 200,
         search: params?.search || undefined,
         branchId: params?.branchId || undefined,
         startDate: params?.startDate || undefined,
         endDate: params?.endDate || undefined,
-      }),
+      }, signal),
   });
 }
 
@@ -1045,6 +1045,14 @@ export function useProfitOverview(period: string, branchId?: string, enabled = t
   });
 }
 
+export function useDisposedProducts(branchId?: string) {
+  const identity = useAuthStore(s => [s.user?.id, s.user?.role?.name].join(':'));
+  return useQuery({
+    queryKey: ['stats', 'disposed-products', identity, branchId ?? ''],
+    queryFn: async ({ signal }) => (await api.get('/stats/disposed-products', { params: { branchId: branchId || undefined }, signal })).data.data as Array<{ name: string; brandName: string; quantity: number; value: number }>,
+  });
+}
+
 export function useTopProducts(branchId?: string) {
   return useQuery({
     queryKey: ['stats', 'top-products', { branchId }],
@@ -1093,8 +1101,9 @@ export function useSalesSummary(params?: { branchId?: string; startDate?: string
 export function useDisposals(params?: { search?: string; branchId?: string; startDate?: string; endDate?: string; status?: string }) {
   return useQuery({
     queryKey: ['disposals', params ?? {}],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await api.get('/disposals', {
+        signal,
         params: {
           limit: 200,
           search: params?.search || undefined,

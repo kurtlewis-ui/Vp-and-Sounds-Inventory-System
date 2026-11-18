@@ -51,6 +51,13 @@ export class StatsController {
     return { success: true, data };
   }
 
+  @Get('disposed-products')
+  @Roles('Owner', 'Admin')
+  @ApiOperation({ summary: 'Approved disposal quantities and permitted loss totals by product' })
+  async disposedProducts(@Query('branchId') branchId: string | undefined, @CurrentUser() user: RequestUser) {
+    return { success: true, data: await this.statsService.disposedProducts(branchId || undefined, user) };
+  }
+
   @Get('top-products')
   @Roles('Owner', 'Admin')
   @ApiOperation({ summary: 'Top selling products by units' })

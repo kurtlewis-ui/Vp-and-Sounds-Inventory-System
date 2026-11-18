@@ -1,3 +1,4 @@
+import { paymentSummarySql, saleAggregatePredicate } from '../../common/utils/sale-aggregate.util';
 import { isSupportedRole } from '../../common/utils/roles';
 import {
   BadRequestException,
@@ -156,44 +157,15 @@ export class SalesService {
         skip,
         take: limit,
       }),
-      // Summary across the whole filtered set (not just current page).
-      // Payment now varies per item, so this sums item-level amounts
-      // (splitting Split-payment items across their buckets) rather than a
-      // DB-level groupBy on the sale's single payment method.
-      this.prisma.saleItem.findMany({
-        where: { sale: where },
-        select: { paymentMethod: true, subTotal: true, paymentSplit: true, discount: true, unitPrice: true, quantity: true },
-      }),
+      // Only one aggregate row crosses the database connection, even for a long history.
+      this.prisma.$queryRaw<Array<Record<string, Prisma.Decimal>>>(paymentSummarySql(saleAggregatePredicate({
+        status, branchId: where.branchId as string | undefined,
+        dateRange: where.createdAt as { gte?: Date; lt?: Date } | undefined, search,
+      }))),
     ]);
-
-    // grossSales = Σ(unitPrice × qty) BEFORE discount. total (net) below is
-    // grossSales − discount. Showing both makes the reduction transparent:
-    // Gross − Discount = Net. The discount is only ever subtracted ONCE
-    // (gross → net); the cash/gcash buckets already use the net subTotal.
-    const summary = { grossSales: 0, cash: 0, gcash: 0, bpi: 0, bdo: 0, discount: 0, total: 0, count: total };
-    for (const item of summaryItems) {
-      summary.grossSales += Number(item.unitPrice) * item.quantity;
-      // Total Discount is the sum of per-item discounts. This is DISPLAY only:
-      // the payment buckets below use subTotal (= unitPrice*qty - discount),
-      // so the discount is already deducted from cash/gcash/total — we must NOT
-      // subtract it again anywhere or it would be double-counted.
-      summary.discount += Number(item.discount || 0);
-      if (item.paymentMethod === 'Split' && item.paymentSplit) {
-        const split = item.paymentSplit as unknown as {
-          cash: number; gcash: number; bpi: number; bdo: number;
-        };
-        summary.cash += Number(split.cash || 0);
-        summary.gcash += Number(split.gcash || 0);
-        summary.bpi += Number(split.bpi || 0);
-        summary.bdo += Number(split.bdo || 0);
-      } else {
-        const amount = Number(item.subTotal);
-        if (item.paymentMethod === 'Cash') summary.cash += amount;
-        else if (item.paymentMethod === 'Gcash') summary.gcash += amount;
-        else if (item.paymentMethod === 'BPI') summary.bpi += amount;
-        else if (item.paymentMethod === 'BDO') summary.bdo += amount;
-      }
-    }
+    const row = summaryItems[0];
+    const summary = { grossSales: Number(row?.grossSales ?? 0), discount: Number(row?.discount ?? 0),
+      cash: Number(row?.cash ?? 0), gcash: Number(row?.gcash ?? 0), bpi: Number(row?.bpi ?? 0), bdo: Number(row?.bdo ?? 0), total: 0, count: total };
     summary.total = summary.cash + summary.gcash + summary.bpi + summary.bdo;
 
     return {
@@ -727,7 +699,12 @@ export class SalesService {
       staff: { select: { id: true, firstName: true, lastName: true, email: true } },
       // Include each item's current product image (via productId) so item
       // tables can show a small thumbnail. Null when the product was deleted.
-      items: { include: { product: { select: { image: true } } } },
+      items: { select: {
+        id: true, productId: true, name: true, brandName: true, quantity: true,
+        unitPrice: true, discount: true, subTotal: true, paymentMethod: true,
+        bankNote: true, note: true, paymentSplit: true, addedAt: true,
+        product: { select: { image: true } },
+      } },
     } satisfies Prisma.SaleInclude;
   }
 

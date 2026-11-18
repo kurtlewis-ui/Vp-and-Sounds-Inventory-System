@@ -8,6 +8,7 @@ describe('Role-aware financial summaries', () => {
   let service: StatsService;
   beforeEach(() => {
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ capital: 200, discount: 50, cash: 950 }]),
       sale: { aggregate: jest.fn().mockResolvedValue({ _sum: { total: 950 } }) },
       saleItem: { aggregate: jest.fn().mockResolvedValue({ _sum: { subTotal: 950, discount: 50 } }), findMany: jest.fn().mockResolvedValue([{ quantity: 2, costPrice: 100 }]) },
       expense: { aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 80 } }) },
@@ -21,12 +22,15 @@ describe('Role-aware financial summaries', () => {
     expect(result).toEqual({ totalGrossSales: 1000, totalSales: 950, totalDiscount: 50, totalExpenses: 80, disposalLosses: 250, net: 620 });
     expect(prisma.disposal.aggregate).toHaveBeenCalledWith({ where: expect.objectContaining({ branchId: 'shop', status: 'APPROVED', createdAt: { gte: new Date('2026-11-14T16:00:00Z'), lt: new Date('2026-11-15T16:00:00Z') } }), _sum: { sellingValue: true } });
     expect(prisma.saleItem.findMany).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
     for (const key of ['capital', 'costPrice', 'margin', 'grossProfit', 'netProfit']) expect(result).not.toHaveProperty(key);
   });
   it('Owner profit keeps cost-based capital and disposal', async () => {
     const result = await service.profitSummary(undefined, undefined, undefined);
     expect(result).toMatchObject({ grossSales: 1000, capital: 200, disposalLosses: 100, netProfit: 570 });
     expect(prisma.disposal.aggregate).toHaveBeenCalledWith(expect.objectContaining({ _sum: { value: true } }));
+    expect(prisma.saleItem.findMany).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw.mock.calls[0][0].text).toContain('SUM(i.cost_price * i.quantity)');
   });
   it.each(['Admin', 'Staff', 'Owner'])('%s branch strip uses permitted disposal valuation', async role => {
     prisma.saleItem.findMany.mockResolvedValue([{ paymentMethod: 'Cash', subTotal: 950 }]);
