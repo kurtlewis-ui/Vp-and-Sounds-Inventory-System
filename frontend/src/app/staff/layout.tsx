@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { BrandIdentity } from '@/components/BrandIdentity';
 import { useMobileNavigation } from '@/lib/useMobileNavigation';
 import { useAuthStore } from '@/lib/store';
@@ -346,6 +347,7 @@ function formatAddedTime(iso?: string): string {
 }
 
 function DraftBag() {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const { contentTheme } = useThemeStore();
   const [open, setOpen] = useState(false);
@@ -453,6 +455,9 @@ function DraftBag() {
     if (Date.now() - lastLocalEditAt.current < 3000) return;
     suppressNextSync.current = true;
     clear();
+    // Another session submitted/cleared this draft. Refresh any expense rows
+    // it contained when the existing draft-status check notices the change.
+    if (expenses.length > 0) void queryClient.invalidateQueries({ queryKey: ['expenses'] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myDraftExists]);
 
