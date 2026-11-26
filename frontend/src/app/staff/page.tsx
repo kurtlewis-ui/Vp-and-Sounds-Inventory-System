@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { useBrands, useProducts } from '@/lib/hooks';
 import { useAuthStore } from '@/lib/store';
+import { matchesProductSearch } from '@/lib/product-search';
 import { getApiErrorMessage } from '@/lib/api';
 import { GridSkeleton } from '@/components/Skeleton';
 
@@ -22,26 +23,26 @@ export default function StaffHomePage() {
   // Pass the staff's branch so each brand's productCount reflects ONLY products
   // active in their shop (not a global count) — otherwise a brand could show
   // "2 products" yet open to an empty list.
-  const { data, isLoading, isError, error } = useBrands(debouncedSearch, branchId);
+  const { data, isLoading, isError, error } = useBrands(debouncedSearch, branchId, !!branchId);
   const brands = data?.data ?? [];
 
   // Also fetch products when there's a search query (for cross-brand product
   // search). Pass branchId so the price shown in search results is the staff's
   // branch price, matching the selling page — not the global default.
-  const { data: productData, isLoading: productsLoading } = useProducts({ search: debouncedSearch, branchId });
+  const { data: productData, isLoading: productsLoading, isError: productError, error: productErrorMessage, refetch: retryProducts } = useProducts({ search: debouncedSearch, branchId, requireBranch: true, all: true }, !!debouncedSearch.trim());
   const allProducts = productData?.data ?? [];
 
-  // Only show products section if the search matches product names but not brand names
+  // Keep parent products returned for a matching active flavor/color, too.
   const matchingProducts = useMemo(() => {
     if (!debouncedSearch.trim()) return [];
     return allProducts.filter((p) =>
-      p.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+      matchesProductSearch(p, debouncedSearch, branchId)
     );
-  }, [allProducts, debouncedSearch]);
+  }, [allProducts, debouncedSearch, branchId]);
 
   // Debounce search input by 300ms
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => clearTimeout(timer);
   }, [search]);
 
@@ -65,7 +66,9 @@ export default function StaffHomePage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {!branchId ? (
+        <div className="py-16 text-center text-accent-orange">Your account is not assigned to a shop. Ask an admin to assign one.</div>
+      ) : isLoading || (!!debouncedSearch && productsLoading) ? (
         <GridSkeleton count={10} />
       ) : isError ? (
         <div className="py-16 text-center text-accent-red">{getApiErrorMessage(error)}</div>
@@ -111,6 +114,13 @@ export default function StaffHomePage() {
             </div>
           )}
 
+          {!!debouncedSearch && productError && (
+            <div role="alert" className="mt-6 rounded-lg border border-accent-red/30 p-4 text-sm text-accent-red">
+              <p>{getApiErrorMessage(productErrorMessage, 'Could not load product search results.')}</p>
+              <button type="button" onClick={() => retryProducts()} className="mt-2 rounded-lg border border-input-border px-3 py-2 text-text-primary">Retry product search</button>
+            </div>
+          )}
+
           {/* Product Results (when searching) */}
           {debouncedSearch.trim() && matchingProducts.length > 0 && (
             <div className="mt-8">
@@ -142,7 +152,7 @@ export default function StaffHomePage() {
           )}
 
           {/* No results */}
-          {brands.length === 0 && matchingProducts.length === 0 && (
+          {brands.length === 0 && matchingProducts.length === 0 && !productError && (
             <div className="py-16 text-center text-text-muted">No brands or products found.</div>
           )}
         </>

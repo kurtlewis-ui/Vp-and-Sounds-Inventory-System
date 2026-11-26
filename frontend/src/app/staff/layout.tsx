@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { BrandIdentity } from '@/components/BrandIdentity';
+import { useMobileNavigation } from '@/lib/useMobileNavigation';
 import { useAuthStore } from '@/lib/store';
 import { useDraftStore, type DraftItem } from '@/lib/draft';
 import { useThemeStore } from '@/lib/theme';
@@ -49,6 +51,11 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [themeAnimKey, setThemeAnimKey] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  useMobileNavigation({ open: sidebarOpen, onClose: closeSidebar, panelRef: sidebarRef,
+    triggerRef: menuTriggerRef, desktopQuery: '(min-width: 768px)', ready: mounted });
 
   useEffect(() => setMounted(true), []);
 
@@ -132,22 +139,15 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
 
       {/* Sidebar — desktop always visible, mobile slides in. Restrained glass:
           translucent nav tint + blur for depth, keeping the dark identity. */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col bg-nav-bg border-r border-nav-border transition-transform duration-200 md:translate-x-0 ${
+      <aside id="staff-navigation" ref={sidebarRef} tabIndex={-1} role={sidebarOpen ? 'dialog' : undefined} aria-modal={sidebarOpen ? true : undefined} aria-label="Main navigation" className={`fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col bg-nav-bg border-r border-nav-border transition-transform duration-200 md:translate-x-0 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        {/* Logo */}
-        <div className="flex items-center gap-4 px-5 py-5 border-b border-nav-border">
-          <span className="logo-shimmer block h-9 w-9 overflow-hidden rounded-full ring-2 ring-white/80 shrink-0">
-            <img src="/logo.png" alt="Vape and Sounds" className="block h-full w-full object-cover rounded-full" />
-          </span>
-          <div className="leading-tight text-center">
-            <p className="text-base font-bold text-white">Vape and Sounds</p>
-            <p className="text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</p>
-          </div>
+        <div className="flex h-[84px] shrink-0 items-center justify-center border-b border-nav-border px-4">
+          <BrandIdentity />
         </div>
 
         {/* Navigation — white active state */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const active = isActive(item.href);
             return (
@@ -222,24 +222,19 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
       {/* Mobile header */}
       {/* Mobile header: same solid navy as the sidebar (bg-nav-bg) so the two
           read as one continuous surface. */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 bg-nav-bg border-b border-nav-border">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-30 grid min-h-[72px] grid-cols-[40px_minmax(0,1fr)_40px] items-center px-4 py-3 sm:px-6 bg-nav-bg border-b border-nav-border">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="p-2 rounded-lg text-[#999999] hover:text-white hover:bg-white/5 transition-colors"
           aria-label="Toggle navigation"
+          aria-expanded={sidebarOpen}
+          aria-controls="staff-navigation"
+          ref={menuTriggerRef}
         >
           {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <div className="flex items-center gap-3.5">
-          <span className="logo-shimmer block h-8 w-8 overflow-hidden rounded-full ring-2 ring-white/80 shrink-0">
-            <img src="/logo.png" alt="Vape and Sounds" className="block h-full w-full object-cover rounded-full" />
-          </span>
-          <div className="leading-tight text-center">
-            <span className="block text-sm font-bold text-white">Vape and Sounds</span>
-            <span className="block text-[9px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</span>
-          </div>
-        </div>
-        <div className="w-9" />
+        <BrandIdentity />
+        <div aria-hidden="true" className="w-10" />
       </header>
 
       {/* FIXED, theme-aware brand wallpaper behind the staff content area.

@@ -120,8 +120,19 @@ export function Select({
       if (triggerRef.current?.contains(t) || listRef.current?.contains(t)) return;
       setOpen(false);
     }
+    function onEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
     document.addEventListener('pointerdown', onDown, true);
-    return () => document.removeEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onEscape, true);
+    };
   }, [open]);
 
   // On open, highlight the current selection (or first enabled option).
