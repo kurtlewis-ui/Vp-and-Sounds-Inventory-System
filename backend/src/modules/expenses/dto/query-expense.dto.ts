@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { ExpenseStatus } from '@prisma/client';
 
 export class QueryExpenseDto {
   @ApiProperty({ required: false, default: 1 })
@@ -37,4 +38,11 @@ export class QueryExpenseDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  // @Query() validates the complete query before the controller reads status.
+  // Staff reports request status=PENDING after submitting draft expenses.
+  @ApiProperty({ required: false, enum: ExpenseStatus })
+  @IsOptional()
+  @IsEnum(ExpenseStatus)
+  status?: ExpenseStatus;
 }
