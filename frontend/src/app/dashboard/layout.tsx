@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { BrandIdentity } from '@/components/BrandIdentity';
+import { useMobileNavigation } from '@/lib/useMobileNavigation';
 import { useAuthStore } from '@/lib/store';
 import { useThemeStore } from '@/lib/theme';
 import {
@@ -108,8 +110,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  useMobileNavigation({ open: sidebarOpen, onClose: closeSidebar, panelRef: sidebarRef,
+    triggerRef: menuTriggerRef, desktopQuery: '(min-width: 1024px)', ready: mounted });
   const [themeAnimKey, setThemeAnimKey] = useState(0);
-  const navRef = useRef<HTMLElement>(null);
+  const navRef = sidebarRef;
 
   useEffect(() => {
     if (!openDropdown) return;
@@ -206,24 +213,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           content). This is the only always-navy surface; the main content
           keeps its own theme. */}
       <aside
-        ref={navRef}
+        id="dashboard-navigation"
+        ref={sidebarRef}
+        tabIndex={-1}
+        role={sidebarOpen ? 'dialog' : undefined}
+        aria-modal={sidebarOpen ? true : undefined}
+        aria-label="Main navigation"
         className={`fixed inset-y-0 left-0 z-50 flex w-[240px] flex-col bg-nav-bg border-r border-nav-border transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-4 px-5 py-5 border-b border-nav-border">
-          <span className="logo-shimmer block h-9 w-9 overflow-hidden rounded-full ring-2 ring-white/80 shrink-0">
-            <img src="/logo.png" alt="Vape and Sounds" className="block h-full w-full object-cover rounded-full" />
-          </span>
-          <div className="leading-tight text-center">
-            <p className="text-base font-bold text-white">Vape and Sounds</p>
-            <p className="text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</p>
-          </div>
+        <div className="flex h-[84px] shrink-0 items-center justify-center border-b border-nav-border px-4">
+          <BrandIdentity />
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const active = isActive(item);
             const hasDropdown = !!item.dropdown;
@@ -372,24 +377,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div className={`relative z-10 lg:ml-[240px] flex-1 flex flex-col min-h-screen content-transition ${contentTheme === 'light' ? 'content-light' : ''}`}>
         {/* Top bar (mobile only). Uses the same solid navy as the sidebar
             (bg-nav-bg) so the header and side nav read as one surface. */}
-        <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 bg-nav-bg border-b border-nav-border lg:hidden">
+        <header className="sticky top-0 z-30 grid min-h-[72px] grid-cols-[40px_minmax(0,1fr)_40px] items-center px-4 py-3 sm:px-6 bg-nav-bg border-b border-nav-border lg:hidden">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="flex items-center rounded-lg p-2 text-nav-text hover:text-white hover:bg-white/5 transition-colors"
             aria-label="Toggle navigation"
+            aria-expanded={sidebarOpen}
+            aria-controls="dashboard-navigation"
+            ref={menuTriggerRef}
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="flex items-center gap-4">
-            <span className="logo-shimmer block h-9 w-9 overflow-hidden rounded-full ring-2 ring-white/80 shrink-0">
-              <img src="/logo.png" alt="Vape and Sounds" className="block h-full w-full object-cover rounded-full" />
-            </span>
-            <div className="leading-tight text-center">
-              <span className="block text-base font-bold text-white">Vape and Sounds</span>
-              <span className="block text-[10px] font-semibold tracking-[0.2em] text-nav-text uppercase">EST. 2021</span>
-            </div>
-          </div>
-          <div className="w-9" />
+          <BrandIdentity />
+          <div aria-hidden="true" className="w-10" />
         </header>
 
         {/* Page Content — give desktop more room to breathe (the doc noted the
