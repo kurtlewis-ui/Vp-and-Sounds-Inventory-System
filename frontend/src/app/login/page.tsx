@@ -2,10 +2,12 @@
 
 import { roleLandingPath } from '@/lib/roles';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, getApiErrorMessage, warmUpBackend } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
+import { useBackendReadiness } from '@/lib/use-backend-readiness';
+import { loginConnectionMessage } from '@/lib/backend-readiness';
 import type { ApiEnvelope, AuthUser } from '@/lib/types';
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 
@@ -24,20 +26,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    warmUpBackend();
-  }, []);
+  const { ensureReady, serverStatus } = useBackendReadiness();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (loading) return;
     setError(null);
     setLoading(true);
 
     try {
+      await ensureReady();
       const response = await api.post<ApiEnvelope<LoginData>>('/auth/login', {
         email,
         password,
-      });
+      }, { timeout: 30_000 });
 
       const { accessToken, user } = response.data.data;
       const landing = roleLandingPath(user.role?.name);
@@ -55,7 +57,9 @@ export default function LoginPage() {
       } else if (status === 403) {
         setError(getApiErrorMessage(err, 'Your account is disabled. Please contact an administrator.'));
       } else {
-        setError(getApiErrorMessage(err, 'Something went wrong. Please try again.'));
+        if ((err as { name?: string })?.name !== 'AbortError') {
+          setError(loginConnectionMessage(err) || getApiErrorMessage(err, 'Something went wrong. Please try again.'));
+        }
       }
     } finally {
       setLoading(false);
@@ -134,6 +138,13 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {serverStatus === 'waking' && (
+              <div role="status" aria-live="polite" className="rounded-xl border border-input-border bg-surface-muted px-4 py-3 text-sm text-text-secondary">
+                <p className="font-semibold text-text-primary">Connecting to server…</p>
+                <p className="mt-1">The server may be waking up after inactivity. This can take up to 2 minutes. Please keep this page open.</p>
+              </div>
+            )}
+
             {/* Error Message */}
             {error && (
               <div
@@ -149,6 +160,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
+              aria-busy={loading}
               className="w-full rounded-xl bg-white px-4 py-3.5 font-semibold text-black shadow-lg shadow-white/10 transition-all hover:bg-gray-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
@@ -157,7 +169,7 @@ export default function LoginPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Logging in...
+                  {serverStatus === 'ready' ? 'Logging in...' : 'Starting server...'}
                 </span>
               ) : (
                 'LOG IN'
